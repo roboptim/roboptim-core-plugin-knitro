@@ -25,15 +25,16 @@ SET(CONSTRAINT_TYPE_1 ::roboptim::GenericLinearFunction)
 SET(CONSTRAINT_TYPE_2 ::roboptim::GenericDifferentiableFunction)
 
 SET(SCHITTKOWSKI_PROBLEMS_FAIL
-  15 16
-  20 25 28
-  33
-  40 47 48 49
-  50 51 52 53 54 55 56
-  61 63 66
-  72 76 78 79
-  80 81
-  54b)
+  2 8
+  13 14 17
+  20 24 25 28
+  32 34
+  47 48 49
+  50 55 56
+  60
+  71
+  71b
+  )
 
 BUILD_SCHITTKOWSKI_PROBLEMS()
 BUILD_ROBOPTIM_PROBLEMS()

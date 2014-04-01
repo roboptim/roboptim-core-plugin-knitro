@@ -53,7 +53,9 @@ namespace roboptim
     clist_t;
 
 public:
-    typedef problem_t::value_type value_type;
+    typedef problem_t::function_t::matrix_t matrix_t;
+    typedef problem_t::function_t::value_type value_type;
+    typedef problem_t::vector_t vector_t;
 
     /// \brief Parent type.
     typedef Solver<GenericDifferentiableFunction<EigenMatrixDense>, clist_t>
@@ -76,6 +78,16 @@ public:
     virtual std::ostream& print (std::ostream& o) const throw ();
 
     void setIterationCallback (callback_t callback) throw (std::runtime_error);
+
+    const callback_t& callback () const throw ()
+    {
+      return callback_;
+    }
+
+    solverState_t& solverState () throw ()
+    {
+      return solverState_;
+    }
 
   protected:
     int computeConstraintsSize () throw ();

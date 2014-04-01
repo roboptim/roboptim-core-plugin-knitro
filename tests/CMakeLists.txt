@@ -17,7 +17,7 @@
 SET(PLUGIN_PATH "${CMAKE_BINARY_DIR}/src")
 INCLUDE(shared-tests/tests.cmake)
 
-SET(SOLVER_NAME "cfsqp")
+SET(SOLVER_NAME "knitro")
 SET(FUNCTION_TYPE ::roboptim::EigenMatrixDense)
 SET(PROGRAM_SUFFIX "")
 SET(COST_FUNCTION_TYPE ::roboptim::GenericDifferentiableFunction)

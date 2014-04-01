@@ -43,6 +43,11 @@ IF(HAS_NO_UNDEFINED)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-undefined")
 ENDIF()
 
+# OpenMP is required by KNITRO
+FIND_PACKAGE(OpenMP)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+
 # Search for dependencies.
 SET(BOOST_COMPONENTS
   date_time filesystem system thread program_options unit_test_framework)

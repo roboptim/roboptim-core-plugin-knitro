@@ -25,7 +25,7 @@ SET(CONSTRAINT_TYPE_1 ::roboptim::GenericLinearFunction)
 SET(CONSTRAINT_TYPE_2 ::roboptim::GenericDifferentiableFunction)
 
 SET(SCHITTKOWSKI_PROBLEMS_FAIL
-  2 8
+  2
   13 14 17
   20 24 25 28
   32 34

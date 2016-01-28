@@ -24,8 +24,10 @@
 # include <vector>
 
 # include <boost/mpl/vector.hpp>
-
 # include <boost/variant.hpp>
+# include <boost/optional.hpp>
+
+# include <roboptim/core/differentiable-function.hh>
 # include <roboptim/core/derivable-function.hh>
 # include <roboptim/core/linear-function.hh>
 # include <roboptim/core/solver.hh>
@@ -41,16 +43,8 @@ namespace roboptim
 
   /// \brief KNITRO based solver.
   class ROBOPTIM_DLLEXPORT KNITROSolver
-    : public Solver<GenericDifferentiableFunction<EigenMatrixDense>,
-		    boost::mpl::vector<
-		      GenericLinearFunction<EigenMatrixDense>,
-		      GenericDifferentiableFunction<EigenMatrixDense> > >
+    : public Solver<EigenMatrixDense>
   {
-    /// \brief CLIST parameter passed to parent.
-    typedef boost::mpl::vector<
-      GenericLinearFunction<EigenMatrixDense>,
-      GenericDifferentiableFunction<EigenMatrixDense> >
-    clist_t;
 
 public:
     typedef problem_t::function_t::matrix_t matrix_t;
@@ -58,11 +52,8 @@ public:
     typedef problem_t::vector_t vector_t;
 
     /// \brief Parent type.
-    typedef Solver<GenericDifferentiableFunction<EigenMatrixDense>, clist_t>
-      parent_t;
+    typedef Solver<EigenMatrixDense> parent_t;
 
-    /// \brief Instantiate the solver from a problem.
-    ///
     /// \param problem problem that will be solved
     explicit KNITROSolver (const problem_t& problem) throw ();
 
@@ -70,6 +61,12 @@ public:
 
     /// \brief Solve the problem.
     virtual void solve () throw ();
+
+    void
+    HandleErrorCode(int errorCode);
+
+    bool
+    setKnitroParams();
 
     /// \brief Display the solver on the specified output stream.
     ///

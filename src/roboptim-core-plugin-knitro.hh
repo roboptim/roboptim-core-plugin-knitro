@@ -49,7 +49,9 @@ namespace roboptim
   public:
     typedef problem_t::function_t::matrix_t matrix_t;
     typedef problem_t::function_t::value_type value_type;
-    typedef problem_t::vector_t vector_t;
+    typedef problem_t::function_t::vector_t vector_t;
+    typedef problem_t::function_t::argument_t argument_t;
+    typedef problem_t::function_t::result_t result_t;
 
     /// \brief Parent type.
     typedef Solver<EigenMatrixDense> parent_t;

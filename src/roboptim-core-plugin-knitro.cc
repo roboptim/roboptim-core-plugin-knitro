@@ -14,13 +14,18 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with roboptim.  If not, see <http://www.gnu.org/licenses/>.
+
+#include <stdexcept>
+
+#include <boost/static_assert.hpp>
+
+#include <knitro.h>
+
 #include <roboptim/core/function.hh>
 #include <roboptim/core/indent.hh>
 #include <roboptim/core/result.hh>
 #include <roboptim/core/result-with-warnings.hh>
 #include <roboptim/core/util.hh>
-
-#include <knitro.h>
 
 #include "roboptim-core-plugin-knitro.hh"
 
@@ -55,7 +60,7 @@ namespace roboptim
   };
 
   static int KNITRO_callback (const int evalRequestCode, const int n,
-                              const int(m), const int /* nnzJ */,
+                              const int m, const int /* nnzJ */,
                               const int /* nnzH */, const double* const x,
                               const double* const /* lambda */,
                               double* const obj, double* const c,
@@ -143,17 +148,29 @@ namespace roboptim
     KTR_free (&knitro_);
   }
 
+#define FILL_RESULT()  \
+  res.x = x;           \
+  res.lambda = lambda; \
+  res.value = obj
+
 #define SWITCH_ERROR(NAME, ERROR)  \
   case NAME:                       \
+  {                                \
+    Result res (n, 1);             \
+    FILL_RESULT ();                \
     result_ = SolverError (ERROR); \
-    break
+  }                                \
+  break
 
 // FIXME Fill with actual warning
-#define SWITCH_WARNING(NAME, WARNING) \
-  case NAME:                          \
-  {                                   \
-    result_ = SolverError (WARNING);  \
-  }                                   \
+#define SWITCH_WARNING(NAME, WARNING)                 \
+  case NAME:                                          \
+  {                                                   \
+    ResultWithWarnings res (n, 1);                    \
+    FILL_RESULT ();                                   \
+    res.warnings.push_back (SolverWarning (WARNING)); \
+    result_ = res;                            \
+  }                                                   \
   break
 
 #define MAP_KNITRO_ERRORS(MACRO)                                                \
@@ -162,14 +179,14 @@ namespace roboptim
          "relative change in the solution estimate is less than that "          \
          "specified by the parameter xtol. To try to get more accuracy one "    \
          "may decrease xtol. If xtol is very small already, it is an "          \
-         "indication that no more significant progress can be made. It’s "    \
+         "indication that no more significant progress can be made. It's "      \
          "possible the approximate feasible solution is optimal, but perhaps "  \
          "the stopping tests cannot be satisfied because of degeneracy, "       \
          "ill-conditioning or bad scaling.");                                   \
   MACRO (KTR_RC_FEAS_NO_IMPROVE,                                                \
          "Primal feasible solution estimate cannot be improved; desired "       \
          "accuracy in dual feasibility could not be achieved. No further "      \
-         "progress can be made. It’s possible the approximate feasible "      \
+         "progress can be made. It's possible the approximate feasible "        \
          "solution is optimal, but perhaps the stopping tests cannot be "       \
          "satisfied because of degeneracy, ill-conditioning or bad scaling.");  \
   MACRO (KTR_RC_FEAS_FTOL,                                                      \
@@ -178,7 +195,7 @@ namespace roboptim
          "specified by the parameter ftol for ftol_iters consecutive "          \
          "iterations. To try to get more accuracy one may decrease ftol "       \
          "and/or increase ftol_iters. If ftol is very small already, it is "    \
-         "an indication that no more significant progress can be made. It’s " \
+         "an indication that no more significant progress can be made. It's "   \
          "possible the approximate feasible solution is optimal, but perhaps "  \
          "the stopping tests cannot be satisfied because of degeneracy, "       \
          "ill-conditioning or bad scaling.");                                   \
@@ -240,7 +257,7 @@ namespace roboptim
   MACRO (KTR_RC_OUT_OF_MEMORY,                                                  \
          "Not enough memory available to solve problem. This termination "      \
          "value indicates that there was not enough memory available to "       \
-         "solve the problem.");
+         "solve the problem.")
 
 #define MAP_KNITRO_WARNINGS(MACRO)                                            \
   MACRO (KTR_RC_NEAR_OPT,                                                     \
@@ -258,12 +275,14 @@ namespace roboptim
          "required stopping criteria. A feasible point was found. The time "  \
          "limit can be increased through the user options maxtime_cpu and "   \
          "maxtime_real.");                                                    \
-  MACRO (KTR_RC_FEVAL_LIMIT,                                                  \
-         "The function evaluation limit was reached before being able to "    \
-         "satisfy the required stopping criteria. A feasible point was "      \
-         "found. The function evaluation limit can be increased through the " \
-         "user option maxfevals.");                                           \
-  MACRO (KTR_RC_USER_TERMINATION, "Knitro has been terminated by the user.");
+  MACRO (KTR_RC_USER_TERMINATION, "Knitro has been terminated by the user.")
+
+  // TODO: investigate the following error code:
+  // MACRO (KTR_RC_FEVAL_LIMIT,
+  //        "The function evaluation limit was reached before being able to "
+  //        "satisfy the required stopping criteria. A feasible point was "
+  //        "found. The function evaluation limit can be increased through the "
+  //        "user option maxfevals.");
 
   void KNITROSolver::solve ()
   {
@@ -276,10 +295,10 @@ namespace roboptim
     // Problem definition
 
     // number of variables
-    int n = static_cast<int> (this->problem ().function ().inputSize ());
+    int n = static_cast<int> (problem ().function ().inputSize ());
 
     // number of constraints
-    int cSize = static_cast<int> (this->problem ().constraintsOutputSize ());
+    int cSize = static_cast<int> (problem ().constraintsOutputSize ());
     int nnzJ = n * cSize;
     int nnzH = 0;
 
@@ -287,67 +306,66 @@ namespace roboptim
     int objGoal = KTR_OBJGOAL_MINIMIZE;
 
     // bounds and constraints type
-    std::vector<double> xLoBnds (n);
-    std::vector<double> xUpBnds (n);
+    vector_t xLoBnds (n);
+    vector_t xUpBnds (n);
     for (int i = 0; i < n; i++)
     {
-      if (this->problem ().argumentBounds ()[i].first == -Function::infinity ())
+      if (problem ().argumentBounds ()[i].first == -Function::infinity ())
         xLoBnds[i] = -KTR_INFBOUND;
       else
-        xLoBnds[i] = this->problem ().argumentBounds ()[i].first;
+        xLoBnds[i] = problem ().argumentBounds ()[i].first;
 
-      if (this->problem ().argumentBounds ()[i].second == Function::infinity ())
+      if (problem ().argumentBounds ()[i].second == Function::infinity ())
         xUpBnds[i] = KTR_INFBOUND;
       else
-        xUpBnds[i] = this->problem ().argumentBounds ()[i].second;
+        xUpBnds[i] = problem ().argumentBounds ()[i].second;
     }
 
-    std::vector<int> cType (cSize);
-    std::vector<double> cLoBnds (cSize);
-    std::vector<double> cUpBnds (cSize);
+    Eigen::VectorXi cType (cSize);
+    vector_t cLoBnds (cSize);
+    vector_t cUpBnds (cSize);
 
     typedef KNITROSolver::problem_t::constraints_t::const_iterator iterator_t;
     ptrdiff_t offset = 0;
-    for (iterator_t it = this->problem ().constraints ().begin ();
-         it != this->problem ().constraints ().end (); ++it)
+    for (iterator_t it = problem ().constraints ().begin ();
+         it != problem ().constraints ().end (); ++it)
     {
       assert (offset < cSize);
-      ptrdiff_t i = it - this->problem ().constraints ().begin ();
+      ptrdiff_t i = it - problem ().constraints ().begin ();
 
-      const boost::shared_ptr<Function> constraint =
-        boost::static_pointer_cast<Function> (*it);
-      for (int j = 0; j < constraint->outputSize (); j++)
+      for (int j = 0; j < (*it)->outputSize (); j++)
       {
         // FIXME: dispatch linear constraints here
         cType[offset + j] = KTR_CONTYPE_GENERAL;
-        if (this->problem ().boundsVector ()[i][j].first ==
+        if (problem ().boundsVector ()[i][j].first ==
             -Function::infinity ())
           cLoBnds[offset + j] = -KTR_INFBOUND;
         else
-          cLoBnds[offset + j] = this->problem ().boundsVector ()[i][j].first;
+          cLoBnds[offset + j] = problem ().boundsVector ()[i][j].first;
 
-        if (this->problem ().boundsVector ()[i][j].second ==
+        if (problem ().boundsVector ()[i][j].second ==
             Function::infinity ())
           cUpBnds[offset + j] = KTR_INFBOUND;
         else
-          cUpBnds[offset + j] = this->problem ().boundsVector ()[i][j].second;
+          cUpBnds[offset + j] = problem ().boundsVector ()[i][j].second;
       }
 
-      offset += constraint->outputSize ();
+      offset += (*it)->outputSize ();
     }
 
     // initial point
-    Eigen::Matrix<value_type, Eigen::Dynamic, 1> xInitial;
-    if (this->problem ().startingPoint ())
-      xInitial = *this->problem ().startingPoint ();
+    argument_t xInitial (n);
+    if (problem ().startingPoint ())
+      xInitial = *problem ().startingPoint ();
     else
-      xInitial.resize (this->problem ().function ().inputSize (),
-                       value_type ());
+      xInitial.setZero ();
 
     // sparsity pattern (dense here)
-    std::vector<int> jacIndexVars (nnzJ);
-    std::vector<int> jacIndexCons (nnzJ);
+    Eigen::VectorXi jacIndexVars (nnzJ);
+    Eigen::VectorXi jacIndexCons (nnzJ);
 
+    // FIXME: this depends on RowMajor/ColMajor
+    BOOST_STATIC_ASSERT (Eigen::ROBOPTIM_STORAGE_ORDER == Eigen::ColMajor);
     int k = 0;
     for (int i = 0; i < n; i++)
       for (int j = 0; j < cSize; j++)
@@ -357,29 +375,22 @@ namespace roboptim
         k++;
       }
 
-    nStatus = KTR_init_problem (knitro_, n, objGoal, objType, &xLoBnds[0],
-                                &xUpBnds[0], cSize, &cType[0], &cLoBnds[0],
-                                &cUpBnds[0], nnzJ, &jacIndexVars[0],
-                                &jacIndexCons[0], nnzH, 0, 0, &xInitial[0], 0);
+    nStatus = KTR_init_problem (knitro_, n, objGoal, objType, xLoBnds.data(),
+                                xUpBnds.data(), cSize, cType.data(), cLoBnds.data(),
+                                cUpBnds.data(), nnzJ, jacIndexVars.data(),
+                                jacIndexCons.data(), nnzH, 0, 0, xInitial.data(), 0);
 
-    vector_t x (this->problem ().function ().inputSize ());
+    argument_t x (n);
     vector_t lambda (cSize + n);
-    vector_t obj (1);
+    result_t obj (1);
     nStatus =
-      KTR_solve (knitro_, &x[0], &lambda[0], 0, &obj[0], 0, 0, 0, 0, 0, this);
+      KTR_solve (knitro_, x.data(), lambda.data(), 0, obj.data(), 0, 0, 0, 0, 0, this);
 
     switch (nStatus)
     {
       MAP_KNITRO_WARNINGS (SWITCH_WARNING);
       MAP_KNITRO_ERRORS (SWITCH_ERROR);
     }
-
-    Result res (n, 1);
-    res.x = x;
-    res.value = obj;
-    res.constraints.resize (cSize); // FIXME: fill me.
-    res.lambda = lambda;
-    result_ = res;
 
     KTR_free (&knitro_);
   }
@@ -404,7 +415,8 @@ namespace roboptim
     // Much more options are available for Knitro see Knitro documentation
 
     if (!knitro_) knitro_ = KTR_new ();
-    if (!knitro_) result_ = SolverError ("failed to initialize KNITRO");
+    if (!knitro_) throw std::runtime_error ("failed to initialize KNITRO");
+
     if (KTR_set_int_param_by_name (knitro_, "par_numthreads", 8))
       result_ =
         SolverError ("failed to set number of threads for multi-threading");

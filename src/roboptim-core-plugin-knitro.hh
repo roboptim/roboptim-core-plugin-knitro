@@ -17,7 +17,7 @@
 
 #ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_HH
 # define ROBOPTIM_CORE_PLUGIN_KNITRO_HH
-# include <roboptim/core/portability.hh>
+
 # include <iostream>
 # include <string>
 # include <utility>
@@ -27,6 +27,7 @@
 # include <boost/variant.hpp>
 # include <boost/optional.hpp>
 
+# include <roboptim/core/portability.hh>
 # include <roboptim/core/differentiable-function.hh>
 # include <roboptim/core/derivable-function.hh>
 # include <roboptim/core/linear-function.hh>
@@ -42,11 +43,10 @@ namespace roboptim
   /// @{
 
   /// \brief KNITRO based solver.
-  class ROBOPTIM_DLLEXPORT KNITROSolver
-    : public Solver<EigenMatrixDense>
+  class ROBOPTIM_DLLEXPORT KNITROSolver : public Solver<EigenMatrixDense>
   {
 
-public:
+  public:
     typedef problem_t::function_t::matrix_t matrix_t;
     typedef problem_t::function_t::value_type value_type;
     typedef problem_t::vector_t vector_t;
@@ -62,11 +62,9 @@ public:
     /// \brief Solve the problem.
     virtual void solve ();
 
-    void 
-    initializeParameters();
+    void initializeParameters ();
 
-    void 
-    updateParameters ();
+    void updateParameters ();
 
     /// \brief Display the solver on the specified output stream.
     ///
@@ -101,5 +99,3 @@ public:
 } // end of namespace roboptim
 
 #endif //! ROBOPTIM_CORE_PLUGIN_KNITRO_HH
-
-//  LocalWords:  KNITRO

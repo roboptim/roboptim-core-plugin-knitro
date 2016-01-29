@@ -32,45 +32,45 @@
 
 namespace roboptim
 {
-  struct KnitroParametersUpdater : public boost::static_visitor<>
-  {
-    explicit KnitroParametersUpdater (KTR_context* app, const std::string& key)
-      : app (app), key (key)
-    {
-    }
-
-    void operator() (const Function::value_type& val) const
-    {
-      KTR_set_double_param_by_name (app, key.c_str (), val);
-    }
-
-    void operator() (const int& val) const
-    {
-      KTR_set_int_param_by_name (app, key.c_str (), val);
-    }
-
-    template <typename T>
-    void operator() (const T&) const
-    {
-      throw std::runtime_error ("option type not supported by KNITRO");
-    }
-
-  private:
-    KTR_context* app;
-    const std::string& key;
-  };
-
-  static int KNITRO_callback (const int evalRequestCode, const int n,
-                              const int m, const int /* nnzJ */,
-                              const int /* nnzH */, const double* const x,
-                              const double* const /* lambda */,
-                              double* const obj, double* const c,
-                              double* const objGrad, double* const jac,
-                              double* const /* hessian */,
-                              double* const /* hessVector */, void* userParams)
+  int iterationCallback (KTR_context_ptr /* kc */, const int n,
+                         const int /* m */, const int /* nnzJ */,
+                         const double* const x,
+                         const double* const /* lambda */, const double obj,
+                         const double* const /* c */,
+                         const double* const /* objGrad */,
+                         const double* const /* jac */, void* userParams)
   {
     typedef KNITROSolver::vector_t vector_t;
-    typedef KNITROSolver::value_type value_type;
+    typedef KNITROSolver::solverState_t solverState_t;
+
+    if (!userParams)
+    {
+      std::cerr << "bad user params\n";
+      return -1;
+    }
+    const KNITROSolver* solver = static_cast<const KNITROSolver*> (userParams);
+
+    if (!solver->callback ()) return 0;
+
+    solverState_t& solverState = solver->solverState ();
+    solverState.x () = Eigen::Map<const vector_t> (x, n);
+    solverState.cost () = obj;
+
+    return 0;
+  }
+
+  int computeCallback (const int evalRequestCode, const int n, const int m,
+                       const int /* nnzJ */, const int /* nnzH */,
+                       const double* const x, const double* const /* lambda */,
+                       double* const obj, double* const c,
+                       double* const objGrad, double* const jac,
+                       double* const /* hessian */,
+                       double* const /* hessVector */, void* userParams)
+  {
+    typedef KNITROSolver::argument_t argument_t;
+    typedef KNITROSolver::gradient_t gradient_t;
+    typedef KNITROSolver::jacobian_t jacobian_t;
+    typedef KNITROSolver::result_t result_t;
     typedef KNITROSolver::problem_t::constraints_t::const_iterator iterator_t;
 
     if (!userParams)
@@ -80,20 +80,19 @@ namespace roboptim
     }
     KNITROSolver* solver = static_cast<KNITROSolver*> (userParams);
 
-    // Eigen::Map<const typename function_t::vector_t> x_ (x, n);
-    Eigen::Map<const Eigen::Matrix<value_type, Eigen::Dynamic, 1> > x_ (x, n);
+    const Eigen::Map<const argument_t> x_ (x, n);
+
     // ask to evaluate objective and constraints
     if (evalRequestCode == KTR_RC_EVALFC)
     {
-      Eigen::Map<Eigen::Matrix<value_type, Eigen::Dynamic, 1> > obj_ (obj, 1);
+      Eigen::Map<result_t> obj_ (obj, 1);
 
       // objective
       obj_ = solver->problem ().function () (x_);
 
       // constraints
       ptrdiff_t idx = 0;
-      Eigen::Map<Eigen::Matrix<value_type, Eigen::Dynamic, 1> > constraintsBuf (
-        c, m, 1);
+      Eigen::Map<result_t> constraintsBuf (c, m);
       for (iterator_t it = solver->problem ().constraints ().begin ();
            it != solver->problem ().constraints ().end (); ++it)
       {
@@ -104,7 +103,7 @@ namespace roboptim
     // evaluate cost gradient and constraints jacobian
     else if (evalRequestCode == KTR_RC_EVALGA)
     {
-      Eigen::Map<vector_t> objGrad_ (objGrad, n);
+      Eigen::Map<gradient_t> objGrad_ (objGrad, n);
 
       // cost gradient
       const DifferentiableFunction* df = 0;
@@ -117,15 +116,15 @@ namespace roboptim
       // constraints jacobian
       ptrdiff_t idx = 0;
       df = 0;
-      Eigen::Map<KNITROSolver::matrix_t> jacobianBuf (jac, m, n);
+      Eigen::Map<jacobian_t> jacobianBuf (jac, m, n);
       for (iterator_t it = solver->problem ().constraints ().begin ();
            it != solver->problem ().constraints ().end (); ++it)
       {
         if ((*it)->asType<DifferentiableFunction> ())
         {
           df = (*it)->castInto<DifferentiableFunction> ();
-          jacobianBuf.block (idx, 0, (*it)->outputSize (), n) =
-            df->jacobian (x_);
+          df->jacobian (jacobianBuf.block (idx, 0, (*it)->outputSize (), n),
+                        x_);
           idx += (*it)->outputSize ();
         }
       }
@@ -419,14 +418,14 @@ namespace roboptim
     if (!knitro_) throw std::runtime_error ("failed to initialize KNITRO");
 
     if (KTR_set_int_param_by_name (knitro_, "par_numthreads", 8))
-      result_ =
-        SolverError ("failed to set number of threads for multi-threading");
-    if (KTR_set_func_callback (knitro_, &KNITRO_callback))
-      result_ = SolverError ("failed to set objective function callback");
-    if (KTR_set_grad_callback (knitro_, &KNITRO_callback))
-      result_ = SolverError ("failed to set gradient function callback");
-    // if (KTR_set_newpt_callback (knitro_, &KNITRO_newpt_callback))
-    //    result_ = SolverError ("failed to initialize KNITRO");
+      throw std::runtime_error ("failed to set number of threads for multi-threading");
+
+    if (KTR_set_func_callback (knitro_, &computeCallback))
+      throw std::runtime_error ("failed to set evaluation callback");
+    if (KTR_set_grad_callback (knitro_, &computeCallback))
+      throw std::runtime_error ("failed to set gradient callback");
+    if (KTR_set_newpt_callback (knitro_, &iterationCallback))
+      throw std::runtime_error ("failed to set solver callback");
 
     //  Output
     DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);

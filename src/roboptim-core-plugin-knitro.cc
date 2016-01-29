@@ -27,7 +27,8 @@
 #include <roboptim/core/result-with-warnings.hh>
 #include <roboptim/core/util.hh>
 
-#include "roboptim-core-plugin-knitro.hh"
+#include "roboptim/core/plugin/knitro/knitro-solver.hh"
+#include "roboptim/core/plugin/knitro/knitro-parameters-updater.hh"
 
 namespace roboptim
 {

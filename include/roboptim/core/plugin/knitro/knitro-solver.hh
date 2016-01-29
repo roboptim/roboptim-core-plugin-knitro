@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with roboptim.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_HH
-# define ROBOPTIM_CORE_PLUGIN_KNITRO_HH
+#ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
+# define ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
 
 # include <iostream>
 # include <string>
@@ -47,11 +47,16 @@ namespace roboptim
   {
 
   public:
-    typedef problem_t::function_t::matrix_t matrix_t;
-    typedef problem_t::function_t::value_type value_type;
-    typedef problem_t::function_t::vector_t vector_t;
-    typedef problem_t::function_t::argument_t argument_t;
-    typedef problem_t::function_t::result_t result_t;
+    typedef DifferentiableFunction differentiableFunction_t;
+
+    typedef problem_t::function_t function_t;
+    typedef function_t::matrix_t matrix_t;
+    typedef function_t::value_type value_type;
+    typedef function_t::vector_t vector_t;
+    typedef function_t::argument_t argument_t;
+    typedef function_t::result_t result_t;
+    typedef differentiableFunction_t::gradient_t gradient_t;
+    typedef differentiableFunction_t::jacobian_t jacobian_t;
 
     /// \brief Parent type.
     typedef Solver<EigenMatrixDense> parent_t;
@@ -81,18 +86,19 @@ namespace roboptim
       return callback_;
     }
 
-    solverState_t& solverState ()
+    solverState_t& solverState () const
     {
       return solverState_;
     }
 
   private:
-    /// \brief Per-iteration callback
+    /// \brief Per-iteration callback.
     callback_t callback_;
 
     /// \brief Current state of the solver (used by the callback function).
-    solverState_t solverState_;
+    mutable solverState_t solverState_;
 
+    /// \brief KNITRO solver context.
     KTR_context* knitro_;
   };
 
@@ -100,4 +106,4 @@ namespace roboptim
 
 } // end of namespace roboptim
 
-#endif //! ROBOPTIM_CORE_PLUGIN_KNITRO_HH
+#endif //! ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH

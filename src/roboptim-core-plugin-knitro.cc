@@ -24,10 +24,41 @@
 
 #include "roboptim-core-plugin-knitro.hh"
 
-using namespace std;
-
 namespace roboptim
 {
+
+    struct KnitroParametersUpdater : public boost::static_visitor<>
+    {
+      explicit KnitroParametersUpdater
+      (KTR_context* app,
+       const std::string& key)
+      : app (app),
+        key (key)
+      {}
+
+      void
+      operator () (const Function::value_type& val) const
+      {
+          KTR_set_double_param_by_name (app, key.c_str(), val);
+      }
+
+      void
+      operator () (const int& val) const
+      {
+          KTR_set_int_param_by_name (app, key.c_str(), val);
+      }
+
+      template <typename T>
+      void
+      operator () (const T&) const
+      {
+        throw std::runtime_error ("option type not supported by Ipopt.");
+      }
+
+    private:
+      KTR_context* app;
+      const std::string& key;
+    };
 
   static int KNITRO_callback (const int evalRequestCode,
 			      const int n,
@@ -50,7 +81,7 @@ namespace roboptim
 
     if (!userParams)
     {
-        cerr << "bad user params\n";
+        std::cerr << "bad user params\n";
         return -1;
     }
     KNITROSolver* solver = static_cast<KNITROSolver*> (userParams);
@@ -105,55 +136,18 @@ namespace roboptim
     }
     else
     {
-        cerr << "bad evalRequestCode\n";
+        std::cerr << "bad evalRequestCode\n";
         return -1;
     }
     return 0;
   }
-
-  /*static int KNITRO_newpt_callback
-  (KTR_context_ptr,
-   const int,
-   const int,
-   const int,
-   const double* const x,
-   const double* const,
-   const double,
-   const double* const,
-   const double* const,
-   const double* const,
-   void*  userParams)
-  {
-    typedef KNITROSolver::vector_t vector_t;
-
-    if (!userParams)
-      {
-	cerr << "bad user params\n";
-	return -1;
-      }
-    KNITROSolver* solver = static_cast<KNITROSolver*> (userParams);
-    if (!solver->callback ())
-      return 0;
-
-    vector_t x_ = Eigen::Map<const Eigen::VectorXd>
-      (x, solver->problem ().function ().inputSize ());
-    solver->solverState ().x () = x_;
-    solver->callback () (solver->problem (), solver->solverState ());
-    return 0;
-  }*/
-
-#define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)	\
-  do {							\
-    parameters_[KEY].description = DESCRIPTION;		\
-    parameters_[KEY].value = VALUE;			\
-  } while (0)
 
   KNITROSolver::KNITROSolver (const problem_t& problem) throw ()
     : parent_t (problem),
       solverState_ (problem),
       knitro_ ()
   {
-    DEFINE_PARAMETER ("knitro.outlev", "output level", 0);
+    initializeParameters();
   }
 
   KNITROSolver::~KNITROSolver () throw ()
@@ -161,26 +155,70 @@ namespace roboptim
     KTR_free (&knitro_);
   }
 
-  int
-  KNITROSolver::computeConstraintsSize () throw ()
-  {
-    typedef problem_t::constraints_t::const_iterator iterator_t;
-    int result = 0;
 
-    for (iterator_t it = this->problem ().constraints ().begin ();
-	               it != this->problem ().constraints ().end (); ++it)
-        result += static_cast<int> ((*it)->outputSize ());
+#define SWITCH_ERROR(NAME, ERROR)       \
+  case NAME:                            \
+  result_ = SolverError (ERROR);        \
+  break
 
-    return result;
-  }
+//FIXME Fill with actual warning
+#define SWITCH_WARNING(NAME, WARNING)       \
+  case NAME:                                \
+  {                                         \
+      result_ = SolverError (WARNING);      \
+  }                                         \
+  break
+
+#define MAP_KNITRO_ERRORS(MACRO)                     \
+   MACRO(KTR_RC_FEAS_XTOL,     \
+       "Primal feasible solution; the optimization terminated because the relative change in the solution estimate is less than that specified by the parameter xtol. To try to get more accuracy one may decrease xtol. If xtol is very small already, it is an indication that no more significant progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling.");		\
+   MACRO(KTR_RC_FEAS_NO_IMPROVE,       \
+       "Primal feasible solution estimate cannot be improved; desired accuracy in dual feasibility could not be achieved. No further progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling.");		\
+   MACRO(KTR_RC_FEAS_FTOL,     \
+       "Primal feasible solution; the optimization terminated because the relative change in the objective function is less than that specified by the parameter ftol for ftol_iters consecutive iterations. To try to get more accuracy one may decrease ftol and/or increase ftol_iters. If ftol is very small already, it is an indication that no more significant progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling.");		\
+   MACRO(KTR_RC_INFEASIBLE,        \
+       "Convergence to an infeasible point. Problem may be locally infeasible. If problem is believed to be feasible, try multistart to search for feasible points. The algorithm has converged to an infeasible point from which it cannot further decrease the infeasibility measure. This happens when the problem is infeasible, but may also occur on occasion for feasible problems with nonlinear constraints or badly scaled problems. It is recommended to try various initial points with the multi-start feature. If this occurs for a variety of initial points, it is likely the problem is infeasible.");		\
+   MACRO(KTR_RC_INFEAS_XTOL,       \
+       "Terminate at infeasible point because the relative change in the solution estimate is less than that specified by the parameter xtol. To try to find a feasible point one may decrease xtol. If xtol is very small already, it is an indication that no more significant progress can be made. It is recommended to try various initial points with the multi-start feature. If this occurs for a variety of initial points, it is likely the problem is infeasible.");		\
+   MACRO(KTR_RC_INFEAS_NO_IMPROVE,     \
+       "Current infeasible solution estimate cannot be improved. Problem may be badly scaled or perhaps infeasible. If problem is believed to be feasible, try multistart to search for feasible points. If this occurs for a variety of initial points, it is likely the problem is infeasible.");		\
+   MACRO(KTR_RC_INFEAS_MULTISTART,     \
+       "Multistart: no primal feasible point found. The multi-start feature was unable to find a feasible point. If the problem is believed to be feasible, then increase the number of initial points tried in the multi-start feature and also perhaps increase the range from which random initial points are chosen.");		\
+   MACRO(KTR_RC_INFEAS_CON_BOUNDS,     \
+       "The constraint bounds have been determined to be infeasible.");		\
+   MACRO(KTR_RC_INFEAS_VAR_BOUNDS,     \
+       "The variable bounds have been determined to be infeasible.");		\
+   MACRO(KTR_RC_UNBOUNDED,     \
+       "Problem appears to be unbounded. Iterate is feasible and objective magnitude is greater than objrange. The objective function appears to be decreasing without bound, while satisfying the constraints. If the problem really is bounded, increase the size of the parameter objrange to avoid terminating with this message.");		\
+   MACRO(KTR_RC_CALLBACK_ERR,      \
+       "Callback function error. This termination value indicates that an error (i.e., negative return value) occurred in a user provided callback routine.");		\
+   MACRO(KTR_RC_LP_SOLVER_ERR,     \
+       "LP solver error. This termination value indicates that an unrecoverable error occurred in the LP solver used in the active-set algorithm preventing the optimization from continuing.");		\
+   MACRO(KTR_RC_EVAL_ERR,      \
+       "Evaluation error. This termination value indicates that an evaluation error occurred (e.g., divide by 0, taking the square root of a negative number), preventing the optimization from continuing.");		\
+   MACRO(KTR_RC_OUT_OF_MEMORY,     \
+       "Not enough memory available to solve problem. This termination value indicates that there was not enough memory available to solve the problem.");		\
+
+#define MAP_KNITRO_WARNINGS(MACRO)                     \
+   MACRO(KTR_RC_NEAR_OPT,            \
+        "iPrimal feasible solution estimate cannot be improved. It appears to be optimal, but desired accuracy in dual feasibility could not be achieved. No more progress can be made, but the stopping tests are close to being satisfied (within a factor of 100) and so the current approximate solution is believed to be optimal.");       \
+   MACRO(KTR_RC_ITER_LIMIT,        \
+       "The iteration limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The iteration limit can be increased through the user option maxit.");		\
+   MACRO(KTR_RC_TIME_LIMIT,        \
+       "The time limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The time limit can be increased through the user options maxtime_cpu and maxtime_real.");		\
+   MACRO(KTR_RC_FEVAL_LIMIT,       \
+       "The function evaluation limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The function evaluation limit can be increased through the user option maxfevals.");		\
+   MACRO(KTR_RC_USER_TERMINATION,      \
+       "Knitro has been terminated by the user.");		\
 
   void
   KNITROSolver::solve () throw ()
   {
     int nStatus = 0;
 
-    if(!setKnitroParams())
-        return;
+    updateParameters();
+    //if(!setKnitroParams())
+    //    return;
 
     // Problem definition
 
@@ -188,13 +226,12 @@ namespace roboptim
     int n = static_cast<int> (this->problem ().function ().inputSize ());
 
     // number of constraints
-    int cSize = computeConstraintsSize ();
+    int cSize = static_cast<int> (this->problem().constraintsOutputSize());
     int nnzJ = n * cSize;
     int nnzH = 0;
 
     int objType = KTR_OBJTYPE_GENERAL;
     int objGoal = KTR_OBJGOAL_MINIMIZE;
-
 
     // bounds and constraints type
     std::vector<double> xLoBnds (n);
@@ -263,25 +300,21 @@ namespace roboptim
             k++;
         }
 
-
     nStatus = KTR_init_problem (knitro_, n, objGoal, objType,
                 &xLoBnds[0], &xUpBnds[0],
                 cSize, &cType[0], &cLoBnds[0], &cUpBnds[0],
                 nnzJ, &jacIndexVars[0], &jacIndexCons[0],
                 nnzH, 0, 0, &xInitial[0], 0);
 
-    cout << "Start Solver" << endl;
     vector_t x (this->problem ().function ().inputSize ());
     vector_t lambda (cSize + n);
     vector_t obj (1);
     nStatus = KTR_solve (knitro_, &x[0], &lambda[0], 0, &obj[0], 0, 0, 0, 0, 0, this);
 
-    cout << "Solver Resolved" << endl;
-    if (nStatus != 0)
+    switch (nStatus)
     {
-        result_ = SolverError ("failed to solve problem");
-        HandleErrorCode(nStatus);
-        //return;
+        MAP_KNITRO_WARNINGS (SWITCH_WARNING);
+        MAP_KNITRO_ERRORS (SWITCH_ERROR);
     }
 
     Result res (n, 1);
@@ -290,177 +323,89 @@ namespace roboptim
     res.constraints.resize (cSize); //FIXME: fill me.
     res.lambda = lambda;
     result_ = res;
-    //cout << res << endl;
-    cout << res.x << endl;
-    cout << res.value << endl;
 
     KTR_free (&knitro_);
   }
 
-  bool KNITROSolver::setKnitroParams()
+#undef SWITCH_ERROR
+#undef SWITCH_WARNING
+#undef MAP_KNITRO_ERRORS
+#undef MAP_KNITRO_WARNINGS
+  
+#define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)   \
+  do {                          \
+    this->parameters_[KEY].description = DESCRIPTION;   \
+    this->parameters_[KEY].value = VALUE;       \
+  } while (0)
+
+  void 
+  KNITROSolver::initializeParameters ()
   {
+    this->parameters_.clear ();
+
+    // KNITRO specific.
+    // Much more options are available for Knitro see Knitro documentation
+    
     if (!knitro_)
         knitro_ = KTR_new ();
-
     if (!knitro_)
-    {
         result_ = SolverError ("failed to initialize KNITRO");
-        return false;
-    }
-    if (KTR_set_int_param_by_name (knitro_, "algorithm", KTR_ALG_BAR_DIRECT))
-    {
-        result_ = SolverError ("failed to set parameter algorithm");
-        return false;
-    }
-    /*if (KTR_set_int_param_by_name (knitro_, "scale", KTR_SCALE_ALLOW))
-    {
-        result_ = SolverError ("failed to set parameter scale");
-        return false;
-    }*/
-    if (KTR_set_int_param_by_name (knitro_, "maxit", 10))
-    {
-        result_ = SolverError ("failed to set the maximum number of iterations");
-        return false;
-    }
-    if (KTR_set_int_param_by_name (knitro_, "gradopt", KTR_GRADOPT_FORWARD))//FORWARD, EXACT, CENTRAL
-    {
-        result_ = SolverError ("failed to set parameter gradopt");
-        return false;
-    }
-    if (KTR_set_int_param_by_name (knitro_, "hessopt", KTR_HESSOPT_BFGS))
-    {
-        result_ = SolverError ("failed to set parameter hessopt");
-        return false;
-    }
-    if (KTR_set_int_param_by_name (knitro_, "outlev", 4))
-    {
-        result_ = SolverError ("failed to set parameter outlev");
-        return false;
-    }
     if(KTR_set_int_param_by_name (knitro_, "par_numthreads", 8))
-    {
-        result_ = SolverError ("failed to set number of threads");
-        return false;
-    }
-    if(KTR_set_int_param_by_name (knitro_, "honorbnds", KTR_HONORBNDS_ALWAYS))//_abs
-    {
-        result_ = SolverError ("failed to set the initial barriver param");//TolFun
-        return false;
-    }
-    if(KTR_set_double_param_by_name (knitro_, "bar_initmu", 0.01))//_abs
-    {
-        result_ = SolverError ("failed to set the initial barriver param");//TolFun
-        return false;
-    }
-    /*if (KTR_set_int_param_by_name (knitro_, "bar_murule", KTR_BAR_MURULE_FULLMPC))
-    {
-        result_ = SolverError ("failed to set parameter barrier mu rule");
-        return false;
-    }*/
-    if(KTR_set_double_param_by_name (knitro_, "opttol", 1))//_abs
-    {
-        result_ = SolverError ("failed to set the termination tolerance on the function value");//TolFun
-        return false;
-    }
-    if(KTR_set_double_param_by_name (knitro_, "feastol", 1e-2))//_abs, infeastol
-    {
-        result_ = SolverError ("failed to set the termination tolerance on the constraint violation");//TolCon
-        return false;
-    }
-    if(KTR_set_double_param_by_name (knitro_, "xTol", 1e-5))
-    {
-        result_ = SolverError ("failed to set the termination on x");//TolX
-        return false;
-    }
+        result_ = SolverError ("failed to set number of threads for multi-threading");
     if (KTR_set_func_callback (knitro_, &KNITRO_callback))
-    {
-        result_ = SolverError ("failed to set function callback");
-        return false;
-    }
+        result_ = SolverError ("failed to set objective function callback");
     if (KTR_set_grad_callback (knitro_, &KNITRO_callback))
-    {
-        result_ = SolverError ("failed to set gradient callback");
-        return false;
-    }
-    /*if (KTR_set_newpt_callback (knitro_, &KNITRO_newpt_callback))
-    {
-        result_ = SolverError ("failed to set newpt callback");
-        return false;
-    }*/
-    return true;
+        result_ = SolverError ("failed to set gradient function callback");
+    //if (KTR_set_newpt_callback (knitro_, &KNITRO_newpt_callback))
+    //    result_ = SolverError ("failed to initialize KNITRO");
+
+    //  Output
+    DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);
+
+    //Gradient and hessian used
+    DEFINE_PARAMETER ("knitro.gradopt",
+              "type of gradient used", KTR_GRADOPT_FORWARD);
+    DEFINE_PARAMETER ("knitro.hessopt",
+              "type of hessian used", KTR_HESSOPT_BFGS);
+
+    //  Termination
+    DEFINE_PARAMETER ("knitro.maxit",
+              "maximum number of iteration permitted", 10000);
+    DEFINE_PARAMETER ("knitro.opttol",
+              "desired convergence tolerance (relative)", 1);
+    DEFINE_PARAMETER ("knitro.feastol",
+              "desired threshold for the feasibility", 1e-2);
+    DEFINE_PARAMETER ("knitro.xtol",
+              "desired threshold for the constraint violation", 1e-5);
+
+    //  Barrier parameter
+    DEFINE_PARAMETER ("knitro.bar_initmu",
+              "barrier initial mu", 0.01);
+
+    // Linear solver choice.
+    DEFINE_PARAMETER ("knitro.algorithm", "type of solver algorithm",
+                      KTR_ALG_BAR_DIRECT);
   }
 
-  void
-  KNITROSolver::HandleErrorCode(int errorCode)
+#undef DEFINE_PARAMETER
+
+  void KNITROSolver::updateParameters ()
   {
-      switch(errorCode)
-      {
-        case KTR_RC_NEAR_OPT:
-            cout << "iPrimal feasible solution estimate cannot be improved. It appears to be optimal, but desired accuracy in dual feasibility could not be achieved. No more progress can be made, but the stopping tests are close to being satisfied (within a factor of 100) and so the current approximate solution is believed to be optimal." << endl;
-            break;
-        case KTR_RC_FEAS_XTOL:
-            cout << "Primal feasible solution; the optimization terminated because the relative change in the solution estimate is less than that specified by the parameter xtol. To try to get more accuracy one may decrease xtol. If xtol is very small already, it is an indication that no more significant progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling." << endl;
-            break;
-        case KTR_RC_FEAS_NO_IMPROVE:
-            cout << "Primal feasible solution estimate cannot be improved; desired accuracy in dual feasibility could not be achieved. No further progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling." << endl;
-            break;
-        case KTR_RC_FEAS_FTOL:
-            cout << "Primal feasible solution; the optimization terminated because the relative change in the objective function is less than that specified by the parameter ftol for ftol_iters consecutive iterations. To try to get more accuracy one may decrease ftol and/or increase ftol_iters. If ftol is very small already, it is an indication that no more significant progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling." << endl;
-            break;
-        case KTR_RC_INFEASIBLE:
-            cout << "Convergence to an infeasible point. Problem may be locally infeasible. If problem is believed to be feasible, try multistart to search for feasible points. The algorithm has converged to an infeasible point from which it cannot further decrease the infeasibility measure. This happens when the problem is infeasible, but may also occur on occasion for feasible problems with nonlinear constraints or badly scaled problems. It is recommended to try various initial points with the multi-start feature. If this occurs for a variety of initial points, it is likely the problem is infeasible." << endl;
-            break;
-        case KTR_RC_INFEAS_XTOL:
-            cout << "Terminate at infeasible point because the relative change in the solution estimate is less than that specified by the parameter xtol. To try to find a feasible point one may decrease xtol. If xtol is very small already, it is an indication that no more significant progress can be made. It is recommended to try various initial points with the multi-start feature. If this occurs for a variety of initial points, it is likely the problem is infeasible." << endl;
-            break;
-        case KTR_RC_INFEAS_NO_IMPROVE:
-            cout << "Current infeasible solution estimate cannot be improved. Problem may be badly scaled or perhaps infeasible. If problem is believed to be feasible, try multistart to search for feasible points. If this occurs for a variety of initial points, it is likely the problem is infeasible." << endl;
-            break;
-        case KTR_RC_INFEAS_MULTISTART:
-            cout << "Multistart: no primal feasible point found. The multi-start feature was unable to find a feasible point. If the problem is believed to be feasible, then increase the number of initial points tried in the multi-start feature and also perhaps increase the range from which random initial points are chosen." << endl;
-            break;
-        case KTR_RC_INFEAS_CON_BOUNDS:
-            cout << "The constraint bounds have been determined to be infeasible." << endl;
-            break;
-        case KTR_RC_INFEAS_VAR_BOUNDS:
-            cout << "The variable bounds have been determined to be infeasible." << endl;
-            break;
-        case KTR_RC_UNBOUNDED:
-            cout << "Problem appears to be unbounded. Iterate is feasible and objective magnitude is greater than objrange. The objective function appears to be decreasing without bound, while satisfying the constraints. If the problem really is bounded, increase the size of the parameter objrange to avoid terminating with this message." << endl;
-            break;
-        case KTR_RC_ITER_LIMIT:
-            cout << "The iteration limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The iteration limit can be increased through the user option maxit." << endl;
-            break;
-        case KTR_RC_TIME_LIMIT:
-            cout << "The time limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The time limit can be increased through the user options maxtime_cpu and maxtime_real." << endl;
-            break;
-        case KTR_RC_FEVAL_LIMIT:
-            cout << "The function evaluation limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The function evaluation limit can be increased through the user option maxfevals." << endl;
-            break;
-        case KTR_RC_CALLBACK_ERR:
-            cout << "Callback function error. This termination value indicates that an error (i.e., negative return value) occurred in a user provided callback routine." << endl;
-            break;
-        case KTR_RC_LP_SOLVER_ERR:
-            cout << "LP solver error. This termination value indicates that an unrecoverable error occurred in the LP solver used in the active-set algorithm preventing the optimization from continuing." << endl;
-            break;
-        case KTR_RC_EVAL_ERR:
-            cout << "Evaluation error. This termination value indicates that an evaluation error occurred (e.g., divide by 0, taking the square root of a negative number), preventing the optimization from continuing." << endl;
-            break;
-        case KTR_RC_OUT_OF_MEMORY:
-            cout << "Not enough memory available to solve problem. This termination value indicates that there was not enough memory available to solve the problem." << endl;
-            break;
-        case KTR_RC_USER_TERMINATION:
-            cout << "Knitro has been terminated by the user." << endl;
-            break;
-        default:
-            cout << "Unhandled error code of type: " << errorCode << endl;
-            break;
-      }
+    const std::string prefix = "knitro.";
+    typedef const std::pair<const std::string, Parameter> const_iterator_t;
+    BOOST_FOREACH (const_iterator_t& it, this->parameters_)
+    {
+        if (it.first.substr (0, prefix.size ()) == prefix)
+        {
+            boost::apply_visitor
+              (KnitroParametersUpdater
+               (knitro_, it.first.substr (prefix.size ())), it.second.value);
+        }
+    }
   }
 
-
-  ostream&
-  KNITROSolver::print (ostream& o) const throw ()
+  std::ostream&
+  KNITROSolver::print (std::ostream& o) const throw ()
   {
     parent_t::print (o);
     return o;
@@ -468,7 +413,7 @@ namespace roboptim
 
   void
   KNITROSolver::setIterationCallback (callback_t callback)
-    throw (runtime_error)
+    throw (std::runtime_error)
   {
     callback_ = callback;
   }

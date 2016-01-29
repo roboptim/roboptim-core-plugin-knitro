@@ -62,11 +62,11 @@ public:
     /// \brief Solve the problem.
     virtual void solve () throw ();
 
-    void
-    HandleErrorCode(int errorCode);
+    void 
+    initializeParameters();
 
-    bool
-    setKnitroParams();
+    void 
+    updateParameters ();
 
     /// \brief Display the solver on the specified output stream.
     ///
@@ -85,9 +85,6 @@ public:
     {
       return solverState_;
     }
-
-  protected:
-    int computeConstraintsSize () throw ();
 
   private:
     /// \brief Per-iteration callback

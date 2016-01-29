@@ -6,10 +6,9 @@ MACRO(KNITRO_PLUGIN NAME)
     
     SET_TARGET_PROPERTIES(roboptim-core-plugin-${NAME} PROPERTIES
       PREFIX ""
-      SOVERSION 3.1.0)
+      SOVERSION 3.2.0)
     INSTALL(TARGETS roboptim-core-plugin-${NAME}
       DESTINATION ${ROBOPTIM_CORE_PLUGINDIR})
 ENDMACRO()
 
 KNITRO_PLUGIN(knitro)
-KNITRO_PLUGIN(knitro-nograd)

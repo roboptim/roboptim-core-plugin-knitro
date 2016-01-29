@@ -55,12 +55,12 @@ public:
     typedef Solver<EigenMatrixDense> parent_t;
 
     /// \param problem problem that will be solved
-    explicit KNITROSolver (const problem_t& problem) throw ();
+    explicit KNITROSolver (const problem_t& problem);
 
-    virtual ~KNITROSolver () throw ();
+    virtual ~KNITROSolver ();
 
     /// \brief Solve the problem.
-    virtual void solve () throw ();
+    virtual void solve ();
 
     void 
     initializeParameters();
@@ -72,16 +72,16 @@ public:
     ///
     /// \param o output stream used for display
     /// \return output stream
-    virtual std::ostream& print (std::ostream& o) const throw ();
+    virtual std::ostream& print (std::ostream& o) const;
 
-    void setIterationCallback (callback_t callback) throw (std::runtime_error);
+    void setIterationCallback (callback_t callback);
 
-    const callback_t& callback () const throw ()
+    const callback_t& callback () const
     {
       return callback_;
     }
 
-    solverState_t& solverState () throw ()
+    solverState_t& solverState ()
     {
       return solverState_;
     }

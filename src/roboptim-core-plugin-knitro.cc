@@ -132,13 +132,16 @@ namespace roboptim
     return 0;
   }
 
-  KNITROSolver::KNITROSolver (const problem_t& problem) throw ()
+  KNITROSolver::KNITROSolver (const problem_t& problem)
     : parent_t (problem), solverState_ (problem), knitro_ ()
   {
     initializeParameters ();
   }
 
-  KNITROSolver::~KNITROSolver () throw () { KTR_free (&knitro_); }
+  KNITROSolver::~KNITROSolver ()
+  {
+    KTR_free (&knitro_);
+  }
 
 #define SWITCH_ERROR(NAME, ERROR)  \
   case NAME:                       \
@@ -262,7 +265,7 @@ namespace roboptim
          "user option maxfevals.");                                           \
   MACRO (KTR_RC_USER_TERMINATION, "Knitro has been terminated by the user.");
 
-  void KNITROSolver::solve () throw ()
+  void KNITROSolver::solve ()
   {
     int nStatus = 0;
 
@@ -456,14 +459,13 @@ namespace roboptim
     }
   }
 
-  std::ostream& KNITROSolver::print (std::ostream& o) const throw ()
+  std::ostream& KNITROSolver::print (std::ostream& o) const
   {
     parent_t::print (o);
     return o;
   }
 
-  void KNITROSolver::setIterationCallback (callback_t callback) throw (
-    std::runtime_error)
+  void KNITROSolver::setIterationCallback (callback_t callback)
   {
     callback_ = callback;
   }
@@ -493,5 +495,8 @@ ROBOPTIM_DLLEXPORT solver_t* create (const KNITROSolver::problem_t& pb)
   return new KNITROSolver (pb);
 }
 
-ROBOPTIM_DLLEXPORT void destroy (solver_t* p) { delete p; }
+ROBOPTIM_DLLEXPORT void destroy (solver_t* p)
+{
+  delete p;
+}
 }

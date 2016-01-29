@@ -26,54 +26,42 @@
 
 namespace roboptim
 {
-
-    struct KnitroParametersUpdater : public boost::static_visitor<>
+  struct KnitroParametersUpdater : public boost::static_visitor<>
+  {
+    explicit KnitroParametersUpdater (KTR_context* app, const std::string& key)
+      : app (app), key (key)
     {
-      explicit KnitroParametersUpdater
-      (KTR_context* app,
-       const std::string& key)
-      : app (app),
-        key (key)
-      {}
+    }
 
-      void
-      operator () (const Function::value_type& val) const
-      {
-          KTR_set_double_param_by_name (app, key.c_str(), val);
-      }
+    void operator() (const Function::value_type& val) const
+    {
+      KTR_set_double_param_by_name (app, key.c_str (), val);
+    }
 
-      void
-      operator () (const int& val) const
-      {
-          KTR_set_int_param_by_name (app, key.c_str(), val);
-      }
+    void operator() (const int& val) const
+    {
+      KTR_set_int_param_by_name (app, key.c_str (), val);
+    }
 
-      template <typename T>
-      void
-      operator () (const T&) const
-      {
-        throw std::runtime_error ("option type not supported by Ipopt.");
-      }
+    template <typename T>
+    void operator() (const T&) const
+    {
+      throw std::runtime_error ("option type not supported by KNITRO");
+    }
 
-    private:
-      KTR_context* app;
-      const std::string& key;
-    };
+  private:
+    KTR_context* app;
+    const std::string& key;
+  };
 
-  static int KNITRO_callback (const int evalRequestCode,
-			      const int n,
-			      const int (m),
-			      const int /* nnzJ */,
-			      const int /* nnzH */,
-			      const double* const x,
-			      const double* const /* lambda */,
-			      double* const obj,
-			      double* const c,
-			      double* const objGrad ,
-			      double* const jac,
-			      double* const /* hessian */,
-			      double* const /* hessVector */,
-			      void* userParams)
+  static int KNITRO_callback (const int evalRequestCode, const int n,
+                              const int(m), const int /* nnzJ */,
+                              const int /* nnzH */, const double* const x,
+                              const double* const /* lambda */,
+                              double* const obj, double* const c,
+                              double* const objGrad, double* const jac,
+                              double* const /* hessian */,
+                              double* const /* hessVector */, void* userParams)
   {
     typedef KNITROSolver::vector_t vector_t;
     typedef KNITROSolver::value_type value_type;
@@ -81,143 +69,205 @@ namespace roboptim
 
     if (!userParams)
     {
-        std::cerr << "bad user params\n";
-        return -1;
+      std::cerr << "bad user params\n";
+      return -1;
     }
     KNITROSolver* solver = static_cast<KNITROSolver*> (userParams);
 
-    //Eigen::Map<const typename function_t::vector_t> x_ (x, n);
+    // Eigen::Map<const typename function_t::vector_t> x_ (x, n);
     Eigen::Map<const Eigen::Matrix<value_type, Eigen::Dynamic, 1> > x_ (x, n);
     // ask to evaluate objective and constraints
     if (evalRequestCode == KTR_RC_EVALFC)
     {
-        Eigen::Map<Eigen::Matrix<value_type, Eigen::Dynamic, 1> > obj_ (obj, 1);
+      Eigen::Map<Eigen::Matrix<value_type, Eigen::Dynamic, 1> > obj_ (obj, 1);
 
-	    // objective
-	    obj_ = solver->problem ().function () (x_);
+      // objective
+      obj_ = solver->problem ().function () (x_);
 
-	    // constraints
-	    ptrdiff_t idx = 0;
-        Eigen::Map<Eigen::Matrix<value_type, Eigen::Dynamic, 1> > constraintsBuf (c, m, 1);
-	    for (iterator_t it = solver->problem ().constraints ().begin ();
-	         it != solver->problem ().constraints ().end (); ++it)
-	    {
-            constraintsBuf.segment (idx, (*it)->outputSize ()) = (*(*it)) (x_);
-            idx += (*it)->outputSize ();
-	    }
+      // constraints
+      ptrdiff_t idx = 0;
+      Eigen::Map<Eigen::Matrix<value_type, Eigen::Dynamic, 1> > constraintsBuf (
+        c, m, 1);
+      for (iterator_t it = solver->problem ().constraints ().begin ();
+           it != solver->problem ().constraints ().end (); ++it)
+      {
+        constraintsBuf.segment (idx, (*it)->outputSize ()) = (*(*it)) (x_);
+        idx += (*it)->outputSize ();
+      }
     }
     // evaluate cost gradient and constraints jacobian
     else if (evalRequestCode == KTR_RC_EVALGA)
     {
-	    Eigen::Map<vector_t> objGrad_ (objGrad, n);
+      Eigen::Map<vector_t> objGrad_ (objGrad, n);
 
-	    // cost gradient
-        const DifferentiableFunction* df = 0;
-        if(solver->problem ().function ().asType<DifferentiableFunction>())
+      // cost gradient
+      const DifferentiableFunction* df = 0;
+      if (solver->problem ().function ().asType<DifferentiableFunction> ())
+      {
+        df = solver->problem ().function ().castInto<DifferentiableFunction> ();
+        objGrad_ = df->gradient (x_);
+      }
+
+      // constraints jacobian
+      ptrdiff_t idx = 0;
+      df = 0;
+      Eigen::Map<KNITROSolver::matrix_t> jacobianBuf (jac, m, n);
+      for (iterator_t it = solver->problem ().constraints ().begin ();
+           it != solver->problem ().constraints ().end (); ++it)
+      {
+        if ((*it)->asType<DifferentiableFunction> ())
         {
-            df = solver->problem ().function ().castInto<DifferentiableFunction>();
-            objGrad_ = df->gradient (x_);
+          df = (*it)->castInto<DifferentiableFunction> ();
+          jacobianBuf.block (idx, 0, (*it)->outputSize (), n) =
+            df->jacobian (x_);
+          idx += (*it)->outputSize ();
         }
-
-        // constraints jacobian
-	    ptrdiff_t idx = 0;
-        df = 0;
-        Eigen::Map<KNITROSolver::matrix_t> jacobianBuf (jac, m, n);
-	    for (iterator_t it = solver->problem ().constraints ().begin ();
-	         it != solver->problem ().constraints ().end (); ++it)
-	    {
-            if((*it)->asType<DifferentiableFunction>())
-            {
-                df = (*it)->castInto<DifferentiableFunction>();
-                jacobianBuf.block (idx, 0, (*it)->outputSize (), n) = df->jacobian (x_); 
-                idx += (*it)->outputSize ();
-            }
-	    }
+      }
     }
     else
     {
-        std::cerr << "bad evalRequestCode\n";
-        return -1;
+      std::cerr << "bad evalRequestCode\n";
+      return -1;
     }
     return 0;
   }
 
   KNITROSolver::KNITROSolver (const problem_t& problem) throw ()
-    : parent_t (problem),
-      solverState_ (problem),
-      knitro_ ()
+    : parent_t (problem), solverState_ (problem), knitro_ ()
   {
-    initializeParameters();
+    initializeParameters ();
   }
 
-  KNITROSolver::~KNITROSolver () throw ()
-  {
-    KTR_free (&knitro_);
-  }
+  KNITROSolver::~KNITROSolver () throw () { KTR_free (&knitro_); }
 
+#define SWITCH_ERROR(NAME, ERROR)  \
+  case NAME:                       \
+    result_ = SolverError (ERROR); \
+    break
 
-#define SWITCH_ERROR(NAME, ERROR)       \
-  case NAME:                            \
-  result_ = SolverError (ERROR);        \
+// FIXME Fill with actual warning
+#define SWITCH_WARNING(NAME, WARNING) \
+  case NAME:                          \
+  {                                   \
+    result_ = SolverError (WARNING);  \
+  }                                   \
   break
 
-//FIXME Fill with actual warning
-#define SWITCH_WARNING(NAME, WARNING)       \
-  case NAME:                                \
-  {                                         \
-      result_ = SolverError (WARNING);      \
-  }                                         \
-  break
+#define MAP_KNITRO_ERRORS(MACRO)                                                \
+  MACRO (KTR_RC_FEAS_XTOL,                                                      \
+         "Primal feasible solution; the optimization terminated because the "   \
+         "relative change in the solution estimate is less than that "          \
+         "specified by the parameter xtol. To try to get more accuracy one "    \
+         "may decrease xtol. If xtol is very small already, it is an "          \
+         "indication that no more significant progress can be made. It’s "    \
+         "possible the approximate feasible solution is optimal, but perhaps "  \
+         "the stopping tests cannot be satisfied because of degeneracy, "       \
+         "ill-conditioning or bad scaling.");                                   \
+  MACRO (KTR_RC_FEAS_NO_IMPROVE,                                                \
+         "Primal feasible solution estimate cannot be improved; desired "       \
+         "accuracy in dual feasibility could not be achieved. No further "      \
+         "progress can be made. It’s possible the approximate feasible "      \
+         "solution is optimal, but perhaps the stopping tests cannot be "       \
+         "satisfied because of degeneracy, ill-conditioning or bad scaling.");  \
+  MACRO (KTR_RC_FEAS_FTOL,                                                      \
+         "Primal feasible solution; the optimization terminated because the "   \
+         "relative change in the objective function is less than that "         \
+         "specified by the parameter ftol for ftol_iters consecutive "          \
+         "iterations. To try to get more accuracy one may decrease ftol "       \
+         "and/or increase ftol_iters. If ftol is very small already, it is "    \
+         "an indication that no more significant progress can be made. It’s " \
+         "possible the approximate feasible solution is optimal, but perhaps "  \
+         "the stopping tests cannot be satisfied because of degeneracy, "       \
+         "ill-conditioning or bad scaling.");                                   \
+  MACRO (KTR_RC_INFEASIBLE,                                                     \
+         "Convergence to an infeasible point. Problem may be locally "          \
+         "infeasible. If problem is believed to be feasible, try multistart "   \
+         "to search for feasible points. The algorithm has converged to an "    \
+         "infeasible point from which it cannot further decrease the "          \
+         "infeasibility measure. This happens when the problem is "             \
+         "infeasible, but may also occur on occasion for feasible problems "    \
+         "with nonlinear constraints or badly scaled problems. It is "          \
+         "recommended to try various initial points with the multi-start "      \
+         "feature. If this occurs for a variety of initial points, it is "      \
+         "likely the problem is infeasible.");                                  \
+  MACRO (KTR_RC_INFEAS_XTOL,                                                    \
+         "Terminate at infeasible point because the relative change in the "    \
+         "solution estimate is less than that specified by the parameter "      \
+         "xtol. To try to find a feasible point one may decrease xtol. If "     \
+         "xtol is very small already, it is an indication that no more "        \
+         "significant progress can be made. It is recommended to try various "  \
+         "initial points with the multi-start feature. If this occurs for a "   \
+         "variety of initial points, it is likely the problem is "              \
+         "infeasible.");                                                        \
+  MACRO (KTR_RC_INFEAS_NO_IMPROVE,                                              \
+         "Current infeasible solution estimate cannot be improved. Problem "    \
+         "may be badly scaled or perhaps infeasible. If problem is believed "   \
+         "to be feasible, try multistart to search for feasible points. If "    \
+         "this occurs for a variety of initial points, it is likely the "       \
+         "problem is infeasible.");                                             \
+  MACRO (KTR_RC_INFEAS_MULTISTART,                                              \
+         "Multistart: no primal feasible point found. The multi-start "         \
+         "feature was unable to find a feasible point. If the problem is "      \
+         "believed to be feasible, then increase the number of initial "        \
+         "points tried in the multi-start feature and also perhaps increase "   \
+         "the range from which random initial points are chosen.");             \
+  MACRO (KTR_RC_INFEAS_CON_BOUNDS,                                              \
+         "The constraint bounds have been determined to be infeasible.");       \
+  MACRO (KTR_RC_INFEAS_VAR_BOUNDS,                                              \
+         "The variable bounds have been determined to be infeasible.");         \
+  MACRO (KTR_RC_UNBOUNDED,                                                      \
+         "Problem appears to be unbounded. Iterate is feasible and objective "  \
+         "magnitude is greater than objrange. The objective function appears "  \
+         "to be decreasing without bound, while satisfying the constraints. "   \
+         "If the problem really is bounded, increase the size of the "          \
+         "parameter objrange to avoid terminating with this message.");         \
+  MACRO (KTR_RC_CALLBACK_ERR,                                                   \
+         "Callback function error. This termination value indicates that an "   \
+         "error (i.e., negative return value) occurred in a user provided "     \
+         "callback routine.");                                                  \
+  MACRO (KTR_RC_LP_SOLVER_ERR,                                                  \
+         "LP solver error. This termination value indicates that an "           \
+         "unrecoverable error occurred in the LP solver used in the "           \
+         "active-set algorithm preventing the optimization from continuing.");  \
+  MACRO (KTR_RC_EVAL_ERR,                                                       \
+         "Evaluation error. This termination value indicates that an "          \
+         "evaluation error occurred (e.g., divide by 0, taking the square "     \
+         "root of a negative number), preventing the optimization from "        \
+         "continuing.");                                                        \
+  MACRO (KTR_RC_OUT_OF_MEMORY,                                                  \
+         "Not enough memory available to solve problem. This termination "      \
+         "value indicates that there was not enough memory available to "       \
+         "solve the problem.");
 
-#define MAP_KNITRO_ERRORS(MACRO)                     \
-   MACRO(KTR_RC_FEAS_XTOL,     \
-       "Primal feasible solution; the optimization terminated because the relative change in the solution estimate is less than that specified by the parameter xtol. To try to get more accuracy one may decrease xtol. If xtol is very small already, it is an indication that no more significant progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling.");		\
-   MACRO(KTR_RC_FEAS_NO_IMPROVE,       \
-       "Primal feasible solution estimate cannot be improved; desired accuracy in dual feasibility could not be achieved. No further progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling.");		\
-   MACRO(KTR_RC_FEAS_FTOL,     \
-       "Primal feasible solution; the optimization terminated because the relative change in the objective function is less than that specified by the parameter ftol for ftol_iters consecutive iterations. To try to get more accuracy one may decrease ftol and/or increase ftol_iters. If ftol is very small already, it is an indication that no more significant progress can be made. It’s possible the approximate feasible solution is optimal, but perhaps the stopping tests cannot be satisfied because of degeneracy, ill-conditioning or bad scaling.");		\
-   MACRO(KTR_RC_INFEASIBLE,        \
-       "Convergence to an infeasible point. Problem may be locally infeasible. If problem is believed to be feasible, try multistart to search for feasible points. The algorithm has converged to an infeasible point from which it cannot further decrease the infeasibility measure. This happens when the problem is infeasible, but may also occur on occasion for feasible problems with nonlinear constraints or badly scaled problems. It is recommended to try various initial points with the multi-start feature. If this occurs for a variety of initial points, it is likely the problem is infeasible.");		\
-   MACRO(KTR_RC_INFEAS_XTOL,       \
-       "Terminate at infeasible point because the relative change in the solution estimate is less than that specified by the parameter xtol. To try to find a feasible point one may decrease xtol. If xtol is very small already, it is an indication that no more significant progress can be made. It is recommended to try various initial points with the multi-start feature. If this occurs for a variety of initial points, it is likely the problem is infeasible.");		\
-   MACRO(KTR_RC_INFEAS_NO_IMPROVE,     \
-       "Current infeasible solution estimate cannot be improved. Problem may be badly scaled or perhaps infeasible. If problem is believed to be feasible, try multistart to search for feasible points. If this occurs for a variety of initial points, it is likely the problem is infeasible.");		\
-   MACRO(KTR_RC_INFEAS_MULTISTART,     \
-       "Multistart: no primal feasible point found. The multi-start feature was unable to find a feasible point. If the problem is believed to be feasible, then increase the number of initial points tried in the multi-start feature and also perhaps increase the range from which random initial points are chosen.");		\
-   MACRO(KTR_RC_INFEAS_CON_BOUNDS,     \
-       "The constraint bounds have been determined to be infeasible.");		\
-   MACRO(KTR_RC_INFEAS_VAR_BOUNDS,     \
-       "The variable bounds have been determined to be infeasible.");		\
-   MACRO(KTR_RC_UNBOUNDED,     \
-       "Problem appears to be unbounded. Iterate is feasible and objective magnitude is greater than objrange. The objective function appears to be decreasing without bound, while satisfying the constraints. If the problem really is bounded, increase the size of the parameter objrange to avoid terminating with this message.");		\
-   MACRO(KTR_RC_CALLBACK_ERR,      \
-       "Callback function error. This termination value indicates that an error (i.e., negative return value) occurred in a user provided callback routine.");		\
-   MACRO(KTR_RC_LP_SOLVER_ERR,     \
-       "LP solver error. This termination value indicates that an unrecoverable error occurred in the LP solver used in the active-set algorithm preventing the optimization from continuing.");		\
-   MACRO(KTR_RC_EVAL_ERR,      \
-       "Evaluation error. This termination value indicates that an evaluation error occurred (e.g., divide by 0, taking the square root of a negative number), preventing the optimization from continuing.");		\
-   MACRO(KTR_RC_OUT_OF_MEMORY,     \
-       "Not enough memory available to solve problem. This termination value indicates that there was not enough memory available to solve the problem.");		\
+#define MAP_KNITRO_WARNINGS(MACRO)                                            \
+  MACRO (KTR_RC_NEAR_OPT,                                                     \
+         "iPrimal feasible solution estimate cannot be improved. It appears " \
+         "to be optimal, but desired accuracy in dual feasibility could not " \
+         "be achieved. No more progress can be made, but the stopping tests " \
+         "are close to being satisfied (within a factor of 100) and so the "  \
+         "current approximate solution is believed to be optimal.");          \
+  MACRO (KTR_RC_ITER_LIMIT,                                                   \
+         "The iteration limit was reached before being able to satisfy the "  \
+         "required stopping criteria. A feasible point was found. The "       \
+         "iteration limit can be increased through the user option maxit.");  \
+  MACRO (KTR_RC_TIME_LIMIT,                                                   \
+         "The time limit was reached before being able to satisfy the "       \
+         "required stopping criteria. A feasible point was found. The time "  \
+         "limit can be increased through the user options maxtime_cpu and "   \
+         "maxtime_real.");                                                    \
+  MACRO (KTR_RC_FEVAL_LIMIT,                                                  \
+         "The function evaluation limit was reached before being able to "    \
+         "satisfy the required stopping criteria. A feasible point was "      \
+         "found. The function evaluation limit can be increased through the " \
+         "user option maxfevals.");                                           \
+  MACRO (KTR_RC_USER_TERMINATION, "Knitro has been terminated by the user.");
 
-#define MAP_KNITRO_WARNINGS(MACRO)                     \
-   MACRO(KTR_RC_NEAR_OPT,            \
-        "iPrimal feasible solution estimate cannot be improved. It appears to be optimal, but desired accuracy in dual feasibility could not be achieved. No more progress can be made, but the stopping tests are close to being satisfied (within a factor of 100) and so the current approximate solution is believed to be optimal.");       \
-   MACRO(KTR_RC_ITER_LIMIT,        \
-       "The iteration limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The iteration limit can be increased through the user option maxit.");		\
-   MACRO(KTR_RC_TIME_LIMIT,        \
-       "The time limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The time limit can be increased through the user options maxtime_cpu and maxtime_real.");		\
-   MACRO(KTR_RC_FEVAL_LIMIT,       \
-       "The function evaluation limit was reached before being able to satisfy the required stopping criteria. A feasible point was found. The function evaluation limit can be increased through the user option maxfevals.");		\
-   MACRO(KTR_RC_USER_TERMINATION,      \
-       "Knitro has been terminated by the user.");		\
-
-  void
-  KNITROSolver::solve () throw ()
+  void KNITROSolver::solve () throw ()
   {
     int nStatus = 0;
 
-    updateParameters();
-    //if(!setKnitroParams())
+    updateParameters ();
+    // if(!setKnitroParams())
     //    return;
 
     // Problem definition
@@ -226,7 +276,7 @@ namespace roboptim
     int n = static_cast<int> (this->problem ().function ().inputSize ());
 
     // number of constraints
-    int cSize = static_cast<int> (this->problem().constraintsOutputSize());
+    int cSize = static_cast<int> (this->problem ().constraintsOutputSize ());
     int nnzJ = n * cSize;
     int nnzH = 0;
 
@@ -238,15 +288,15 @@ namespace roboptim
     std::vector<double> xUpBnds (n);
     for (int i = 0; i < n; i++)
     {
-        if (this->problem ().argumentBounds ()[i].first == -Function::infinity ())
-            xLoBnds[i] = -KTR_INFBOUND;
-        else
-            xLoBnds[i] = this->problem ().argumentBounds ()[i].first;
+      if (this->problem ().argumentBounds ()[i].first == -Function::infinity ())
+        xLoBnds[i] = -KTR_INFBOUND;
+      else
+        xLoBnds[i] = this->problem ().argumentBounds ()[i].first;
 
-        if (this->problem ().argumentBounds ()[i].second == Function::infinity ())
-            xUpBnds[i] = KTR_INFBOUND;
-        else
-            xUpBnds[i] = this->problem ().argumentBounds ()[i].second;
+      if (this->problem ().argumentBounds ()[i].second == Function::infinity ())
+        xUpBnds[i] = KTR_INFBOUND;
+      else
+        xUpBnds[i] = this->problem ().argumentBounds ()[i].second;
     }
 
     std::vector<int> cType (cSize);
@@ -256,36 +306,40 @@ namespace roboptim
     typedef KNITROSolver::problem_t::constraints_t::const_iterator iterator_t;
     ptrdiff_t offset = 0;
     for (iterator_t it = this->problem ().constraints ().begin ();
-    it != this->problem ().constraints ().end (); ++it)
+         it != this->problem ().constraints ().end (); ++it)
     {
-        assert (offset < cSize);
-        ptrdiff_t i = it - this->problem ().constraints ().begin ();
+      assert (offset < cSize);
+      ptrdiff_t i = it - this->problem ().constraints ().begin ();
 
-        const boost::shared_ptr<Function> constraint = boost::static_pointer_cast<Function> (*it);
-        for (int j = 0; j < constraint->outputSize (); j++)
-        {
-            //FIXME: dispatch linear constraints here
-            cType[offset + j] = KTR_CONTYPE_GENERAL;
-            if (this->problem ().boundsVector ()[i][j].first == -Function::infinity ())
-                cLoBnds[offset + j] = -KTR_INFBOUND;
-            else
-                cLoBnds[offset + j] = this->problem ().boundsVector ()[i][j].first;
+      const boost::shared_ptr<Function> constraint =
+        boost::static_pointer_cast<Function> (*it);
+      for (int j = 0; j < constraint->outputSize (); j++)
+      {
+        // FIXME: dispatch linear constraints here
+        cType[offset + j] = KTR_CONTYPE_GENERAL;
+        if (this->problem ().boundsVector ()[i][j].first ==
+            -Function::infinity ())
+          cLoBnds[offset + j] = -KTR_INFBOUND;
+        else
+          cLoBnds[offset + j] = this->problem ().boundsVector ()[i][j].first;
 
-            if (this->problem ().boundsVector ()[i][j].second == Function::infinity ())
-                cUpBnds[offset + j] = KTR_INFBOUND;
-            else
-                cUpBnds[offset + j] = this->problem ().boundsVector ()[i][j].second;
-        }
+        if (this->problem ().boundsVector ()[i][j].second ==
+            Function::infinity ())
+          cUpBnds[offset + j] = KTR_INFBOUND;
+        else
+          cUpBnds[offset + j] = this->problem ().boundsVector ()[i][j].second;
+      }
 
-        offset += constraint->outputSize ();
+      offset += constraint->outputSize ();
     }
 
     // initial point
     Eigen::Matrix<value_type, Eigen::Dynamic, 1> xInitial;
     if (this->problem ().startingPoint ())
-        xInitial = *this->problem ().startingPoint ();
+      xInitial = *this->problem ().startingPoint ();
     else
-        xInitial.resize(this->problem ().function ().inputSize (), value_type ());
+      xInitial.resize (this->problem ().function ().inputSize (),
+                       value_type ());
 
     // sparsity pattern (dense here)
     std::vector<int> jacIndexVars (nnzJ);
@@ -293,34 +347,34 @@ namespace roboptim
 
     int k = 0;
     for (int i = 0; i < n; i++)
-        for (int j = 0; j < cSize; j++)
-        {
-            jacIndexCons[k] = j;
-            jacIndexVars[k] = i;
-            k++;
-        }
+      for (int j = 0; j < cSize; j++)
+      {
+        jacIndexCons[k] = j;
+        jacIndexVars[k] = i;
+        k++;
+      }
 
-    nStatus = KTR_init_problem (knitro_, n, objGoal, objType,
-                &xLoBnds[0], &xUpBnds[0],
-                cSize, &cType[0], &cLoBnds[0], &cUpBnds[0],
-                nnzJ, &jacIndexVars[0], &jacIndexCons[0],
-                nnzH, 0, 0, &xInitial[0], 0);
+    nStatus = KTR_init_problem (knitro_, n, objGoal, objType, &xLoBnds[0],
+                                &xUpBnds[0], cSize, &cType[0], &cLoBnds[0],
+                                &cUpBnds[0], nnzJ, &jacIndexVars[0],
+                                &jacIndexCons[0], nnzH, 0, 0, &xInitial[0], 0);
 
     vector_t x (this->problem ().function ().inputSize ());
     vector_t lambda (cSize + n);
     vector_t obj (1);
-    nStatus = KTR_solve (knitro_, &x[0], &lambda[0], 0, &obj[0], 0, 0, 0, 0, 0, this);
+    nStatus =
+      KTR_solve (knitro_, &x[0], &lambda[0], 0, &obj[0], 0, 0, 0, 0, 0, this);
 
     switch (nStatus)
     {
-        MAP_KNITRO_WARNINGS (SWITCH_WARNING);
-        MAP_KNITRO_ERRORS (SWITCH_ERROR);
+      MAP_KNITRO_WARNINGS (SWITCH_WARNING);
+      MAP_KNITRO_ERRORS (SWITCH_ERROR);
     }
 
     Result res (n, 1);
     res.x = x;
     res.value = obj;
-    res.constraints.resize (cSize); //FIXME: fill me.
+    res.constraints.resize (cSize); // FIXME: fill me.
     res.lambda = lambda;
     result_ = res;
 
@@ -331,56 +385,54 @@ namespace roboptim
 #undef SWITCH_WARNING
 #undef MAP_KNITRO_ERRORS
 #undef MAP_KNITRO_WARNINGS
-  
-#define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)   \
-  do {                          \
-    this->parameters_[KEY].description = DESCRIPTION;   \
-    this->parameters_[KEY].value = VALUE;       \
+
+#define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)     \
+  do                                                  \
+  {                                                   \
+    this->parameters_[KEY].description = DESCRIPTION; \
+    this->parameters_[KEY].value = VALUE;             \
   } while (0)
 
-  void 
-  KNITROSolver::initializeParameters ()
+  void KNITROSolver::initializeParameters ()
   {
     this->parameters_.clear ();
 
     // KNITRO specific.
     // Much more options are available for Knitro see Knitro documentation
-    
-    if (!knitro_)
-        knitro_ = KTR_new ();
-    if (!knitro_)
-        result_ = SolverError ("failed to initialize KNITRO");
-    if(KTR_set_int_param_by_name (knitro_, "par_numthreads", 8))
-        result_ = SolverError ("failed to set number of threads for multi-threading");
+
+    if (!knitro_) knitro_ = KTR_new ();
+    if (!knitro_) result_ = SolverError ("failed to initialize KNITRO");
+    if (KTR_set_int_param_by_name (knitro_, "par_numthreads", 8))
+      result_ =
+        SolverError ("failed to set number of threads for multi-threading");
     if (KTR_set_func_callback (knitro_, &KNITRO_callback))
-        result_ = SolverError ("failed to set objective function callback");
+      result_ = SolverError ("failed to set objective function callback");
     if (KTR_set_grad_callback (knitro_, &KNITRO_callback))
-        result_ = SolverError ("failed to set gradient function callback");
-    //if (KTR_set_newpt_callback (knitro_, &KNITRO_newpt_callback))
+      result_ = SolverError ("failed to set gradient function callback");
+    // if (KTR_set_newpt_callback (knitro_, &KNITRO_newpt_callback))
     //    result_ = SolverError ("failed to initialize KNITRO");
 
     //  Output
     DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);
 
-    //Gradient and hessian used
-    DEFINE_PARAMETER ("knitro.gradopt",
-              "type of gradient used", KTR_GRADOPT_FORWARD);
-    DEFINE_PARAMETER ("knitro.hessopt",
-              "type of hessian used", KTR_HESSOPT_BFGS);
+    // Gradient and hessian used
+    DEFINE_PARAMETER ("knitro.gradopt", "type of gradient used",
+                      KTR_GRADOPT_FORWARD);
+    DEFINE_PARAMETER ("knitro.hessopt", "type of hessian used",
+                      KTR_HESSOPT_BFGS);
 
     //  Termination
-    DEFINE_PARAMETER ("knitro.maxit",
-              "maximum number of iteration permitted", 10000);
+    DEFINE_PARAMETER ("knitro.maxit", "maximum number of iteration permitted",
+                      10000);
     DEFINE_PARAMETER ("knitro.opttol",
-              "desired convergence tolerance (relative)", 1);
-    DEFINE_PARAMETER ("knitro.feastol",
-              "desired threshold for the feasibility", 1e-2);
+                      "desired convergence tolerance (relative)", 1);
+    DEFINE_PARAMETER ("knitro.feastol", "desired threshold for the feasibility",
+                      1e-2);
     DEFINE_PARAMETER ("knitro.xtol",
-              "desired threshold for the constraint violation", 1e-5);
+                      "desired threshold for the constraint violation", 1e-5);
 
     //  Barrier parameter
-    DEFINE_PARAMETER ("knitro.bar_initmu",
-              "barrier initial mu", 0.01);
+    DEFINE_PARAMETER ("knitro.bar_initmu", "barrier initial mu", 0.01);
 
     // Linear solver choice.
     DEFINE_PARAMETER ("knitro.algorithm", "type of solver algorithm",
@@ -395,59 +447,51 @@ namespace roboptim
     typedef const std::pair<const std::string, Parameter> const_iterator_t;
     BOOST_FOREACH (const_iterator_t& it, this->parameters_)
     {
-        if (it.first.substr (0, prefix.size ()) == prefix)
-        {
-            boost::apply_visitor
-              (KnitroParametersUpdater
-               (knitro_, it.first.substr (prefix.size ())), it.second.value);
-        }
+      if (it.first.substr (0, prefix.size ()) == prefix)
+      {
+        boost::apply_visitor (
+          KnitroParametersUpdater (knitro_, it.first.substr (prefix.size ())),
+          it.second.value);
+      }
     }
   }
 
-  std::ostream&
-  KNITROSolver::print (std::ostream& o) const throw ()
+  std::ostream& KNITROSolver::print (std::ostream& o) const throw ()
   {
     parent_t::print (o);
     return o;
   }
 
-  void
-  KNITROSolver::setIterationCallback (callback_t callback)
-    throw (std::runtime_error)
+  void KNITROSolver::setIterationCallback (callback_t callback) throw (
+    std::runtime_error)
   {
     callback_ = callback;
   }
 
-
 } // end of namespace roboptim.
 
-extern "C"
+extern "C" {
+using namespace roboptim;
+typedef KNITROSolver::parent_t solver_t;
+
+ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ();
+ROBOPTIM_DLLEXPORT solver_t* create (const KNITROSolver::problem_t&);
+ROBOPTIM_DLLEXPORT void destroy (solver_t*);
+
+ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ()
 {
-  using namespace roboptim;
-  typedef KNITROSolver::parent_t solver_t;
+  return sizeof (KNITROSolver::problem_t);
+}
 
-  ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ();
-  ROBOPTIM_DLLEXPORT solver_t* create (const KNITROSolver::problem_t&);
-  ROBOPTIM_DLLEXPORT void destroy (solver_t*);
+ROBOPTIM_DLLEXPORT const char* getTypeIdOfConstraintsList ()
+{
+  return typeid (KNITROSolver::problem_t::constraintsList_t).name ();
+}
 
+ROBOPTIM_DLLEXPORT solver_t* create (const KNITROSolver::problem_t& pb)
+{
+  return new KNITROSolver (pb);
+}
 
-  ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ()
-  {
-    return sizeof (KNITROSolver::problem_t);
-  }
-
-  ROBOPTIM_DLLEXPORT const char* getTypeIdOfConstraintsList ()
-  {
-    return typeid (KNITROSolver::problem_t::constraintsList_t).name ();
-  }
-
-  ROBOPTIM_DLLEXPORT solver_t* create (const KNITROSolver::problem_t& pb)
-  {
-    return new KNITROSolver (pb);
-  }
-
-  ROBOPTIM_DLLEXPORT void destroy (solver_t* p)
-  {
-    delete p;
-  }
+ROBOPTIM_DLLEXPORT void destroy (solver_t* p) { delete p; }
 }

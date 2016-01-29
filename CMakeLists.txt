@@ -21,7 +21,7 @@ INCLUDE(cmake/boost.cmake)
 
 SET(PROJECT_NAME roboptim-core-plugin-knitro)
 SET(PROJECT_DESCRIPTION "RobOptim core KNITRO plug-in")
-SET(PROJECT_URL "http://github.com/laas/roboptim-core-plugin-knitro")
+SET(PROJECT_URL "https://github.com/roboptim/roboptim-core-plugin-knitro")
 
 SET(HEADERS
   )
@@ -53,7 +53,7 @@ ADD_REQUIRED_DEPENDENCY("roboptim-core >= 0.5")
 MESSAGE(STATUS "ROBOPTIM_CORE_PLUGINDIR: " ${ROBOPTIM_CORE_PLUGINDIR})
 
 # Look for KNITRO.
-FIND_PATH(KNITRO_DIR include/knitro.h)
+FIND_PATH(KNITRO_DIR include/knitro.h PATHS /usr /usr/local /opt/KNITRO)
 MESSAGE(STATUS "KNITRO_DIR: " ${KNITRO_DIR})
 IF(NOT KNITRO_DIR)
   MESSAGE(FATAL_ERROR "KNITRO has not been found")

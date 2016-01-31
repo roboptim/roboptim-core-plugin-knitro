@@ -26,6 +26,7 @@
 # include <knitro.h>
 
 # include <roboptim/core/function.hh>
+# include <roboptim/core/util.hh>
 
 namespace roboptim
 {
@@ -46,10 +47,22 @@ namespace roboptim
       KTR_set_int_param_by_name (app, key.c_str (), val);
     }
 
+    void operator() (const char* val) const
+    {
+      KTR_set_char_param_by_name (app, key.c_str (), val);
+    }
+
+    void operator() (const std::string& val) const
+    {
+      KTR_set_char_param_by_name (app, key.c_str (), val.c_str ());
+    }
+
     template <typename T>
     void operator() (const T&) const
     {
-      throw std::runtime_error ("option type not supported by KNITRO");
+      throw std::runtime_error (
+        std::string ("option type not supported by KNITRO: ") +
+        typeString<T> ());
     }
 
   private:

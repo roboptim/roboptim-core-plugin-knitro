@@ -391,8 +391,24 @@ namespace roboptim
 
     switch (nStatus)
     {
+#ifdef KTR_RC_OPTIMAL_OR_SATISFACTORY
+      case KTR_RC_OPTIMAL_OR_SATISFACTORY:
+#else //! KTR_RC_OPTIMAL_OR_SATISFACTORY
+      case KTR_RC_OPTIMAL:
+#endif //! KTR_RC_OPTIMAL_OR_SATISFACTORY
+      {
+
+        Result res (n, 1);
+        FILL_RESULT ();
+        result_ = res;
+        break;
+      }
+
       MAP_KNITRO_WARNINGS (SWITCH_WARNING);
       MAP_KNITRO_ERRORS (SWITCH_ERROR);
+
+      default:
+        throw std::runtime_error ("unknown KNITRO return code");
     }
 
     KTR_free (&knitro_);

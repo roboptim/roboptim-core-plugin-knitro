@@ -44,8 +44,7 @@ IF(HAS_NO_UNDEFINED)
 ENDIF()
 
 # Search for dependencies.
-SET(BOOST_COMPONENTS
-  date_time filesystem system thread program_options unit_test_framework)
+SET(BOOST_COMPONENTS filesystem system unit_test_framework)
 SEARCH_FOR_BOOST()
 
 # Search for Ipopt.

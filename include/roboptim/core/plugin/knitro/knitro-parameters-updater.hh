@@ -64,6 +64,11 @@ namespace roboptim
         (*this) (it->second);
     }
 
+    void operator() (bool val) const
+    {
+      KTR_set_int_param_by_name (app_, key_.c_str (), val? 1:0);
+    }
+
     template <typename T>
     void operator() (const T&) const
     {

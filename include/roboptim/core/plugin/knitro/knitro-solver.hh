@@ -87,6 +87,11 @@ namespace roboptim
     }
 
   private:
+    /// \brief Create the log directory.
+    /// KNITRO does not create it if it does not exist.
+    void createLogDir () const;
+
+  private:
     /// \brief Per-iteration callback.
     callback_t callback_;
 

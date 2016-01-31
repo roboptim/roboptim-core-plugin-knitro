@@ -18,6 +18,8 @@
 #include <stdexcept>
 
 #include <boost/static_assert.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/variant.hpp>
 
 #include <knitro.h>
 
@@ -430,6 +432,11 @@ namespace roboptim
 
     //  Output
     DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);
+    DEFINE_PARAMETER ("knitro.outmode",
+                      "output style (\"screen\", \"file\" or \"both\")",
+                      std::string ("file"));
+    DEFINE_PARAMETER ("knitro.outdir", "output directory", std::string ("."));
+    DEFINE_PARAMETER ("knitro.outappend", "output append mode", false);
 
     // Gradient and hessian used
     DEFINE_PARAMETER ("knitro.gradopt", "type of gradient method used",
@@ -441,7 +448,7 @@ namespace roboptim
     DEFINE_PARAMETER ("knitro.maxit", "maximum number of iteration permitted",
                       10000);
     DEFINE_PARAMETER ("knitro.opttol",
-                      "desired convergence tolerance (relative)", 1);
+                      "desired convergence tolerance (relative)", 1.);
     DEFINE_PARAMETER ("knitro.feastol", "desired threshold for the feasibility",
                       1e-2);
     DEFINE_PARAMETER ("knitro.xtol",
@@ -461,6 +468,9 @@ namespace roboptim
 
   void KNITROSolver::updateParameters ()
   {
+    // Create the log directory
+    createLogDir ();
+
     const std::string prefix = "knitro.";
     typedef const std::pair<const std::string, Parameter> const_iterator_t;
     BOOST_FOREACH (const_iterator_t& it, this->parameters_)
@@ -486,6 +496,32 @@ namespace roboptim
     callback_ = callback;
   }
 
+  void KNITROSolver::createLogDir () const
+  {
+    // If the output level is not 0
+    parameters_t::const_iterator it_lvl, it_file, it_name;
+    it_lvl = parameters_.find ("knitro.outlev");
+    if (it_lvl == parameters_.end ()) return;
+
+    int loglvl = boost::get<int> (it_lvl->second.value);
+    if (loglvl <= 0) return;
+
+    // If logging to file is enabled
+    it_file = parameters_.find ("knitro.outmode");
+    if (it_file == parameters_.end ()) return;
+
+    const std::string& logmode =
+      boost::get<std::string> (it_file->second.value);
+    if (logmode != "file" and logmode != "both") return;
+
+    it_name = parameters_.find ("knitro.outdir");
+    if (it_name != parameters_.end ())
+    {
+      boost::filesystem::path logdir (
+        boost::get<std::string> (it_name->second.value));
+      boost::filesystem::create_directory (logdir);
+    }
+  }
 } // end of namespace roboptim.
 
 extern "C" {

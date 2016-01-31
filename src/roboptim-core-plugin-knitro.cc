@@ -58,6 +58,11 @@ namespace roboptim
     solverState_t& solverState = solver->solverState ();
     solverState.x () = Eigen::Map<const vector_t> (x, n);
     solverState.cost () = obj;
+    // TODO: properly set constraint violation
+    // solverState.constraintViolation () = 0;
+
+    // call user-defined callback
+    solver->callback () (solver->problem (), solverState);
 
     return 0;
   }
@@ -440,8 +445,6 @@ namespace roboptim
       throw std::runtime_error ("failed to set evaluation callback");
     if (KTR_set_grad_callback (knitro_, &computeCallback))
       throw std::runtime_error ("failed to set gradient callback");
-    if (KTR_set_newpt_callback (knitro_, &iterationCallback))
-      throw std::runtime_error ("failed to set solver callback");
 
     //  Output
     DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);
@@ -481,12 +484,21 @@ namespace roboptim
     stringToEnum_ = knitroParameterMap ();
   }
 
-#undef DEFINE_PARAMETER
 
   void KNITROSolver::updateParameters ()
   {
     // Create the log directory
     createLogDir ();
+
+    // If a user-defined callback was set
+    if (callback ())
+    {
+      DEFINE_PARAMETER ("knitro.newpoint",
+                        "action on a newpoint (e.g. callback)", std::string ("user"));
+
+      if (KTR_set_newpt_callback (knitro_, &iterationCallback))
+        throw std::runtime_error ("failed to set solver callback");
+    }
 
     const std::string prefix = "knitro.";
     typedef const std::pair<const std::string, Parameter> const_iterator_t;
@@ -501,6 +513,8 @@ namespace roboptim
       }
     }
   }
+
+#undef DEFINE_PARAMETER
 
   std::ostream& KNITROSolver::print (std::ostream& o) const
   {

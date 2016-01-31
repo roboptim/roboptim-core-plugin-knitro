@@ -20,6 +20,7 @@
 
 # include <string>
 # include <stdexcept>
+# include <map>
 
 # include <boost/variant/static_visitor.hpp>
 
@@ -32,29 +33,35 @@ namespace roboptim
 {
   struct KnitroParametersUpdater : public boost::static_visitor<>
   {
-    explicit KnitroParametersUpdater (KTR_context* app, const std::string& key)
-      : app (app), key (key)
+    explicit KnitroParametersUpdater (KTR_context* app, const std::string& key,
+        const std::map<std::string, int>& stringToEnum)
+      : app_ (app), key_ (key), stringToEnum_ (stringToEnum)
     {
     }
 
     void operator() (const Function::value_type& val) const
     {
-      KTR_set_double_param_by_name (app, key.c_str (), val);
+      KTR_set_double_param_by_name (app_, key_.c_str (), val);
     }
 
     void operator() (const int& val) const
     {
-      KTR_set_int_param_by_name (app, key.c_str (), val);
+      KTR_set_int_param_by_name (app_, key_.c_str (), val);
     }
 
     void operator() (const char* val) const
     {
-      KTR_set_char_param_by_name (app, key.c_str (), val);
+      KTR_set_char_param_by_name (app_, key_.c_str (), val);
     }
 
     void operator() (const std::string& val) const
     {
-      KTR_set_char_param_by_name (app, key.c_str (), val.c_str ());
+      std::map<std::string, int>::const_iterator it;
+      it = stringToEnum_.find (val);
+      if (it == stringToEnum_.end ())
+        (*this) (val.c_str ());
+      else
+        (*this) (it->second);
     }
 
     template <typename T>
@@ -66,8 +73,9 @@ namespace roboptim
     }
 
   private:
-    KTR_context* app;
-    const std::string& key;
+    KTR_context* app_;
+    const std::string& key_;
+    const std::map<std::string, int>& stringToEnum_;
   };
 } // end of namespace roboptim
 

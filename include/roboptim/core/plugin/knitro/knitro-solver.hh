@@ -18,14 +18,9 @@
 #ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
 # define ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
 
-# include <iostream>
 # include <string>
-# include <utility>
-# include <vector>
-
-# include <boost/mpl/vector.hpp>
-# include <boost/variant.hpp>
-# include <boost/optional.hpp>
+# include <ostream>
+# include <map>
 
 # include <roboptim/core/portability.hh>
 # include <roboptim/core/differentiable-function.hh>
@@ -97,6 +92,9 @@ namespace roboptim
 
     /// \brief Current state of the solver (used by the callback function).
     mutable solverState_t solverState_;
+
+    /// \brief Map from strings to KNITRO enums.
+    std::map<std::string, int> stringToEnum_;
 
     /// \brief KNITRO solver context.
     KTR_context* knitro_;

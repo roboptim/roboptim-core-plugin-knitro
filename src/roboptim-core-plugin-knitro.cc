@@ -27,6 +27,7 @@
 #include <roboptim/core/result-with-warnings.hh>
 #include <roboptim/core/util.hh>
 
+#include "roboptim/core/plugin/knitro/util.hh"
 #include "roboptim/core/plugin/knitro/knitro-solver.hh"
 #include "roboptim/core/plugin/knitro/knitro-parameters-updater.hh"
 
@@ -431,10 +432,10 @@ namespace roboptim
     DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);
 
     // Gradient and hessian used
-    DEFINE_PARAMETER ("knitro.gradopt", "type of gradient used",
-                      KTR_GRADOPT_FORWARD);
-    DEFINE_PARAMETER ("knitro.hessopt", "type of hessian used",
-                      KTR_HESSOPT_BFGS);
+    DEFINE_PARAMETER ("knitro.gradopt", "type of gradient method used",
+                      std::string ("GRADOPT_FORWARD"));
+    DEFINE_PARAMETER ("knitro.hessopt", "type of hessian method used",
+                      std::string ("HESSOPT_BFGS"));
 
     //  Termination
     DEFINE_PARAMETER ("knitro.maxit", "maximum number of iteration permitted",
@@ -449,9 +450,11 @@ namespace roboptim
     //  Barrier parameter
     DEFINE_PARAMETER ("knitro.bar_initmu", "barrier initial mu", 0.01);
 
-    // Linear solver choice.
+    // Algorithm choice.
     DEFINE_PARAMETER ("knitro.algorithm", "type of solver algorithm",
-                      KTR_ALG_BAR_DIRECT);
+                      std::string ("ALG_BAR_DIRECT"));
+
+    stringToEnum_ = knitroParameterMap ();
   }
 
 #undef DEFINE_PARAMETER
@@ -465,7 +468,8 @@ namespace roboptim
       if (it.first.substr (0, prefix.size ()) == prefix)
       {
         boost::apply_visitor (
-          KnitroParametersUpdater (knitro_, it.first.substr (prefix.size ())),
+          KnitroParametersUpdater (knitro_, it.first.substr (prefix.size ()),
+                                   stringToEnum_),
           it.second.value);
       }
     }

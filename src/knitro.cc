@@ -30,8 +30,8 @@
 #include <roboptim/core/util.hh>
 
 #include "roboptim/core/plugin/knitro/util.hh"
-#include "roboptim/core/plugin/knitro/knitro-solver.hh"
-#include "roboptim/core/plugin/knitro/knitro-parameters-updater.hh"
+#include "roboptim/core/plugin/knitro/solver.hh"
+#include "roboptim/core/plugin/knitro/parameters-updater.hh"
 
 namespace roboptim
 {

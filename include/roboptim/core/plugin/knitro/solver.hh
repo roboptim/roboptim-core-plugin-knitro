@@ -15,57 +15,85 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with roboptim.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
-# define ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
+#ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_SOLVER_HH
+# define ROBOPTIM_CORE_PLUGIN_KNITRO_SOLVER_HH
 
 # include <string>
 # include <ostream>
 # include <map>
 
+# include <knitro.h>
+
 # include <roboptim/core/portability.hh>
 # include <roboptim/core/differentiable-function.hh>
-# include <roboptim/core/derivable-function.hh>
-# include <roboptim/core/linear-function.hh>
 # include <roboptim/core/solver.hh>
 # include <roboptim/core/util.hh>
 
-/// \brief KNITRO Context pre-declaration.
-class KTR_context;
-
 namespace roboptim
 {
+  /// \brief KNITRO iteration callback.
+  /// \tparam T matrix type.
+  template <typename T>
+  int iterationCallback (KTR_context_ptr kc, const int n, const int m,
+                         const int nnzJ, const double* const x,
+                         const double* const lambda, const double obj,
+                         const double* const c, const double* const objGrad,
+                         const double* const jac, void* userParams);
+
+  /// \brief Compute callback.
+  /// \tparam T matrix type.
+  template <typename T>
+  int computeCallback (const int evalRequestCode, const int n, const int m,
+                       const int nnzJ, const int nnzH, const double* const x,
+                       const double* const lambda, double* const obj,
+                       double* const c, double* const objGrad,
+                       double* const jac, double* const hessian,
+                       double* const hessVector, void* userParams);
+
   /// \addtogroup roboptim_solver
   /// @{
 
   /// \brief KNITRO based solver.
-  class ROBOPTIM_DLLEXPORT KNITROSolver : public Solver<EigenMatrixDense>
+  /// \tparam T matrix type.
+  template <typename T>
+  class ROBOPTIM_DLLEXPORT KNITROSolver : public Solver<T>
   {
 
   public:
-    typedef DifferentiableFunction differentiableFunction_t;
-
-    typedef problem_t::function_t function_t;
-    typedef function_t::matrix_t matrix_t;
-    typedef function_t::value_type value_type;
-    typedef function_t::vector_t vector_t;
-    typedef function_t::argument_t argument_t;
-    typedef function_t::result_t result_t;
-    typedef differentiableFunction_t::gradient_t gradient_t;
-    typedef differentiableFunction_t::jacobian_t jacobian_t;
-
     /// \brief Parent type.
-    typedef Solver<EigenMatrixDense> parent_t;
+    typedef Solver<T> solver_t;
 
-    /// \param problem problem that will be solved
+    typedef typename solver_t::problem_t problem_t;
+    typedef typename solver_t::callback_t callback_t;
+    typedef typename solver_t::solverState_t solverState_t;
+    typedef typename solver_t::parameters_t parameters_t;
+
+    typedef GenericDifferentiableFunction<T> differentiableFunction_t;
+
+    typedef typename problem_t::function_t function_t;
+    typedef typename function_t::matrix_t matrix_t;
+    typedef typename function_t::value_type value_type;
+    typedef typename function_t::size_type size_type;
+    typedef typename function_t::vector_t vector_t;
+    typedef typename function_t::argument_t argument_t;
+    typedef typename function_t::result_t result_t;
+    typedef typename differentiableFunction_t::gradient_t gradient_t;
+    typedef typename differentiableFunction_t::jacobian_t jacobian_t;
+
+    /// \brief Constructor.
+    /// \param problem problem that will be solved.
     explicit KNITROSolver (const problem_t& problem);
 
+    /// \brief Destructor.
     virtual ~KNITROSolver ();
 
     /// \brief Solve the problem.
     virtual void solve ();
 
+    /// \brief Initialize KNITRO parameters.
     void initializeParameters ();
 
+    /// \brief Update KNITRO parameters.
     void updateParameters ();
 
     /// \brief Display the solver on the specified output stream.
@@ -74,22 +102,30 @@ namespace roboptim
     /// \return output stream
     virtual std::ostream& print (std::ostream& o) const;
 
+    /// \brief Set the user-defined iteration callback.
+    /// \param callback iteration callback.
     void setIterationCallback (callback_t callback);
 
-    const callback_t& callback () const
-    {
-      return callback_;
-    }
+    /// \brief Get the user callback.
+    const callback_t& callback () const;
 
-    solverState_t& solverState () const
-    {
-      return solverState_;
-    }
+    /// \brief Get the current solver state.
+    solverState_t& solverState () const;
 
   private:
     /// \brief Create the log directory.
     /// KNITRO does not create it if it does not exist.
     void createLogDir () const;
+
+    /// \brief Fill result data structure.
+    /// \tparam R result type.
+    /// \param res result data structure.
+    /// \param x argument vector at the optimal solution.
+    /// \param lambda lambda at the optimal solution.
+    /// \param obj objective at the optimal solution.
+    template <typename R>
+    void fillResult (R& res, const argument_t& x, const vector_t& lambda,
+                     const result_t& obj) const;
 
   private:
     /// \brief Per-iteration callback.
@@ -109,4 +145,6 @@ namespace roboptim
 
 } // end of namespace roboptim
 
-#endif //! ROBOPTIM_CORE_PLUGIN_KNITRO_KNITRO_SOLVER_HH
+# include "roboptim/core/plugin/knitro/solver.hxx"
+
+#endif //! ROBOPTIM_CORE_PLUGIN_KNITRO_SOLVER_HH

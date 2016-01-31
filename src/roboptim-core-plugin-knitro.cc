@@ -155,9 +155,12 @@ namespace roboptim
     KTR_free (&knitro_);
   }
 
-#define FILL_RESULT()  \
-  res.x = x;           \
-  res.lambda = lambda; \
+#define FILL_RESULT()                                           \
+  res.x = x;                                                    \
+  res.lambda.segment (0, n) = lambda.segment (m, m + n);        \
+  res.lambda.segment (n, n + m) = lambda.segment (0, m);        \
+  res.constraints.resize (m);                                   \
+  KTR_get_constraint_values (knitro_, res.constraints.data ()); \
   res.value = obj
 
 #define SWITCH_ERROR(NAME, ERROR)  \
@@ -305,8 +308,8 @@ namespace roboptim
     int n = static_cast<int> (problem ().function ().inputSize ());
 
     // number of constraints
-    int cSize = static_cast<int> (problem ().constraintsOutputSize ());
-    int nnzJ = n * cSize;
+    int m = static_cast<int> (problem ().constraintsOutputSize ());
+    int nnzJ = n * m;
     int nnzH = 0;
 
     int objType = KTR_OBJTYPE_GENERAL;
@@ -328,16 +331,16 @@ namespace roboptim
         xUpBnds[i] = problem ().argumentBounds ()[i].second;
     }
 
-    Eigen::VectorXi cType (cSize);
-    vector_t cLoBnds (cSize);
-    vector_t cUpBnds (cSize);
+    Eigen::VectorXi cType (m);
+    vector_t cLoBnds (m);
+    vector_t cUpBnds (m);
 
     typedef KNITROSolver::problem_t::constraints_t::const_iterator iterator_t;
     ptrdiff_t offset = 0;
     for (iterator_t it = problem ().constraints ().begin ();
          it != problem ().constraints ().end (); ++it)
     {
-      assert (offset < cSize);
+      assert (offset < m);
       ptrdiff_t i = it - problem ().constraints ().begin ();
 
       for (int j = 0; j < (*it)->outputSize (); j++)
@@ -375,7 +378,7 @@ namespace roboptim
     BOOST_STATIC_ASSERT (Eigen::ROBOPTIM_STORAGE_ORDER == Eigen::ColMajor);
     int k = 0;
     for (int i = 0; i < n; i++)
-      for (int j = 0; j < cSize; j++)
+      for (int j = 0; j < m; j++)
       {
         jacIndexCons[k] = j;
         jacIndexVars[k] = i;
@@ -383,12 +386,12 @@ namespace roboptim
       }
 
     nStatus = KTR_init_problem (knitro_, n, objGoal, objType, xLoBnds.data(),
-                                xUpBnds.data(), cSize, cType.data(), cLoBnds.data(),
+                                xUpBnds.data(), m, cType.data(), cLoBnds.data(),
                                 cUpBnds.data(), nnzJ, jacIndexVars.data(),
                                 jacIndexCons.data(), nnzH, 0, 0, xInitial.data(), 0);
 
     argument_t x (n);
-    vector_t lambda (cSize + n);
+    vector_t lambda (m + n);
     result_t obj (1);
     nStatus =
       KTR_solve (knitro_, x.data(), lambda.data(), 0, obj.data(), 0, 0, 0, 0, 0, this);

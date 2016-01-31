@@ -420,9 +420,6 @@ namespace roboptim
     if (!knitro_) knitro_ = KTR_new ();
     if (!knitro_) throw std::runtime_error ("failed to initialize KNITRO");
 
-    if (KTR_set_int_param_by_name (knitro_, "par_numthreads", 8))
-      throw std::runtime_error ("failed to set number of threads for multi-threading");
-
     if (KTR_set_func_callback (knitro_, &computeCallback))
       throw std::runtime_error ("failed to set evaluation callback");
     if (KTR_set_grad_callback (knitro_, &computeCallback))
@@ -460,6 +457,10 @@ namespace roboptim
     // Algorithm choice.
     DEFINE_PARAMETER ("knitro.algorithm", "type of solver algorithm",
                       std::string ("ALG_BAR_DIRECT"));
+
+    // Miscellaneous
+    DEFINE_PARAMETER ("knitro.par_numthreads",
+                      "number of parallel threads to use", 1);
 
     stringToEnum_ = knitroParameterMap ();
   }

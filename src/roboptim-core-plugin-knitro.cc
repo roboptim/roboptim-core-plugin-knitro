@@ -35,7 +35,7 @@
 
 namespace roboptim
 {
-  int iterationCallback (KTR_context_ptr /* kc */, const int n,
+  int iterationCallback (KTR_context_ptr kc, const int n,
                          const int /* m */, const int /* nnzJ */,
                          const double* const x,
                          const double* const /* lambda */, const double obj,
@@ -58,8 +58,7 @@ namespace roboptim
     solverState_t& solverState = solver->solverState ();
     solverState.x () = Eigen::Map<const vector_t> (x, n);
     solverState.cost () = obj;
-    // TODO: properly set constraint violation
-    // solverState.constraintViolation () = 0;
+    solverState.constraintViolation () = KTR_get_abs_feas_error (kc);
 
     // call user-defined callback
     solver->callback () (solver->problem (), solverState);

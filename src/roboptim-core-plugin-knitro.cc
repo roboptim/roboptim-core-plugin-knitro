@@ -459,16 +459,16 @@ namespace roboptim
 
     //  Termination
     DEFINE_PARAMETER ("knitro.maxit", "maximum number of iteration permitted",
-                      10000);
+                      3000);
     DEFINE_PARAMETER ("knitro.opttol",
-                      "desired convergence tolerance (relative)", 1.);
+                      "desired convergence tolerance (relative)", 1e-6);
     DEFINE_PARAMETER ("knitro.feastol", "desired threshold for the feasibility",
-                      1e-2);
+                      1e-6);
     DEFINE_PARAMETER ("knitro.xtol",
                       "desired threshold for the constraint violation", 1e-5);
 
     //  Barrier parameter
-    DEFINE_PARAMETER ("knitro.bar_initmu", "barrier initial mu", 0.01);
+    DEFINE_PARAMETER ("knitro.bar_initmu", "barrier initial mu", 1e-1);
 
     // Algorithm choice.
     DEFINE_PARAMETER ("knitro.algorithm", "type of solver algorithm",

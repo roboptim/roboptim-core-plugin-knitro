@@ -147,6 +147,9 @@ namespace roboptim
     /// \brief Get the buffer for the gradient of the objective function.
     gradient_t& objGrad () const;
 
+    /// \brief Get the Jacobian buffer.
+    jacobian_t& jacobian () const;
+
   private:
     /// \brief Create the log directory.
     /// KNITRO does not create it if it does not exist.
@@ -172,10 +175,11 @@ namespace roboptim
     /// \param n input size.
     /// \param m output size.
     /// \param x initial x (used only in the sparse case).
+    /// \param jac Jacobian matrix.
     /// \return number of nonzeros in the Jacobian matrix.
     int getSparsityPattern (Eigen::VectorXi& jacIndexVars,
                             Eigen::VectorXi& jacIndexCons, int n, int m,
-                            const argument_t& x) const;
+                            const argument_t& x, jacobian_t& jac) const;
 
     /// \brief Get the starting point, or generate a proper one.
     /// \return starting point.
@@ -196,6 +200,9 @@ namespace roboptim
 
     /// \brief Objective gradient buffer.
     mutable gradient_t objGrad_;
+
+    /// \brief Jacobian matrix buffer.
+    mutable jacobian_t jac_;
 
     /// \brief Map from strings to KNITRO enums.
     std::map<std::string, int> stringToEnum_;

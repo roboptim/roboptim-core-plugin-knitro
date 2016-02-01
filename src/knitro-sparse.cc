@@ -16,6 +16,7 @@
 // along with roboptim.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <roboptim/core/function.hh>
+#include <roboptim/core/util.hh>
 
 #include "roboptim/core/plugin/knitro/solver.hh"
 
@@ -49,20 +50,45 @@ namespace roboptim
   template <>
   inline void evalJacobian (
     double* const jac,
-    typename GenericDifferentiableFunction<EigenMatrixSparse>::const_argument_ref /* x */,
-    const KNITROSolver<EigenMatrixSparse>* /* solver */)
+    typename GenericDifferentiableFunction<EigenMatrixSparse>::const_argument_ref x,
+    const KNITROSolver<EigenMatrixSparse>* solver)
   {
-    // df->jacobian (jac.block (idx, 0, df->outputSize (), df->inputSize ()), x);
-    jac[0] = 42.;
+    typedef KNITROSolver<EigenMatrixSparse> solver_t;
+    typedef typename solver_t::problem_t problem_t;
+    typedef typename solver_t::differentiableFunction_t differentiableFunction_t;
+    typedef typename problem_t::constraints_t::const_iterator iterator_t;
+
+    const problem_t& pb = solver->problem ();
+    int n = static_cast<int> (solver->inputSize ());
+    int m = static_cast<int> (solver->outputSize ());
+
+    ptrdiff_t idx = 0;
+    const differentiableFunction_t* df;
+    Eigen::MappedSparseMatrix<double, StorageOrder>
+      mappedJac (m, n, solver->jacobian ().nonZeros (),
+                 solver->jacobian ().outerIndexPtr(),
+                 solver->jacobian ().innerIndexPtr(), jac);
+    // FIXME: would not clear NaNs
+    mappedJac *= 0.;
+    for (iterator_t it = pb.constraints ().begin ();
+         it != pb.constraints ().end (); ++it)
+    {
+      if ((*it)->asType<differentiableFunction_t> ())
+      {
+        df = (*it)->castInto<differentiableFunction_t> ();
+        updateSparseBlock (mappedJac, df->jacobian (x), idx, 0);
+        idx += df->outputSize ();
+      }
+    }
   }
 
   template <>
   int KNITROSolver<EigenMatrixSparse>::getSparsityPattern (
     Eigen::VectorXi& jacIndexVars, Eigen::VectorXi& jacIndexCons, int n, int m,
-    const argument_t& x) const
+    const argument_t& x, jacobian_t& jac) const
   {
     const problem_t& pb = this->problem ();
-    jacobian_t jac = pb.jacobian (x);
+    jac = pb.jacobian (x);
     size_type idx = 0;
     size_type nnz = jac.nonZeros ();
     jacIndexVars.resize (nnz);

@@ -139,6 +139,7 @@ namespace roboptim
       m_ (problem.constraintsOutputSize ()),
       solverState_ (problem),
       objGrad_ (n_),
+      jac_ (),
       waitTime_ (10),
       knitro_ ()
   {
@@ -374,7 +375,8 @@ namespace roboptim
     // sparsity pattern
     Eigen::VectorXi jacIndexVars;
     Eigen::VectorXi jacIndexCons;
-    int nnzJ = getSparsityPattern (jacIndexVars, jacIndexCons, n, m, xInitial);
+    int nnzJ =
+      getSparsityPattern (jacIndexVars, jacIndexCons, n, m, xInitial, jac_);
     int nnzH = 0;
 
     nStatus =
@@ -535,6 +537,12 @@ namespace roboptim
   typename KNITROSolver<T>::gradient_t& KNITROSolver<T>::objGrad () const
   {
     return objGrad_;
+  }
+
+  template <typename T>
+  typename KNITROSolver<T>::jacobian_t& KNITROSolver<T>::jacobian () const
+  {
+    return jac_;
   }
 
   template <typename T>

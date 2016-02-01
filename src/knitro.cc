@@ -79,7 +79,7 @@ namespace roboptim
   template <>
   int KNITROSolver<EigenMatrixDense>::getSparsityPattern (
     Eigen::VectorXi& jacIndexVars, Eigen::VectorXi& jacIndexCons, int n, int m,
-    const argument_t&) const
+    const argument_t&, jacobian_t&) const
   {
     const int nnz = n * m;
     jacIndexVars.resize (nnz);

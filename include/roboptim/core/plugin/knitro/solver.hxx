@@ -254,7 +254,7 @@ namespace roboptim
 
     // Algorithm choice.
     DEFINE_PARAMETER ("knitro.algorithm", "type of solver algorithm",
-                      std::string ("ALG_BAR_DIRECT"));
+                      std::string ("ALG_AUTOMATIC"));
 
     // Miscellaneous
     DEFINE_PARAMETER ("knitro.par_numthreads",

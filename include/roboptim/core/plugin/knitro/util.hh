@@ -117,31 +117,6 @@ namespace roboptim
   }
 
 #define MAP_KNITRO_ERRORS(MACRO)                                               \
-  MACRO (KTR_RC_FEAS_XTOL,                                                     \
-         "Primal feasible solution; the optimization terminated because the "  \
-         "relative change in the solution estimate is less than that "         \
-         "specified by the parameter xtol. To try to get more accuracy one "   \
-         "may decrease xtol. If xtol is very small already, it is an "         \
-         "indication that no more significant progress can be made. It's "     \
-         "possible the approximate feasible solution is optimal, but perhaps " \
-         "the stopping tests cannot be satisfied because of degeneracy, "      \
-         "ill-conditioning or bad scaling.");                                  \
-  MACRO (KTR_RC_FEAS_NO_IMPROVE,                                               \
-         "Primal feasible solution estimate cannot be improved; desired "      \
-         "accuracy in dual feasibility could not be achieved. No further "     \
-         "progress can be made. It's possible the approximate feasible "       \
-         "solution is optimal, but perhaps the stopping tests cannot be "      \
-         "satisfied because of degeneracy, ill-conditioning or bad scaling."); \
-  MACRO (KTR_RC_FEAS_FTOL,                                                     \
-         "Primal feasible solution; the optimization terminated because the "  \
-         "relative change in the objective function is less than that "        \
-         "specified by the parameter ftol for ftol_iters consecutive "         \
-         "iterations. To try to get more accuracy one may decrease ftol "      \
-         "and/or increase ftol_iters. If ftol is very small already, it is "   \
-         "an indication that no more significant progress can be made. It's "  \
-         "possible the approximate feasible solution is optimal, but perhaps " \
-         "the stopping tests cannot be satisfied because of degeneracy, "      \
-         "ill-conditioning or bad scaling.");                                  \
   MACRO (KTR_RC_INFEASIBLE,                                                    \
          "Convergence to an infeasible point. Problem may be locally "         \
          "infeasible. If problem is believed to be feasible, try multistart "  \
@@ -218,6 +193,31 @@ namespace roboptim
          "required stopping criteria. A feasible point was found. The time "  \
          "limit can be increased through the user options maxtime_cpu and "   \
          "maxtime_real.");                                                    \
+  MACRO (KTR_RC_FEAS_XTOL,                                                     \
+         "Primal feasible solution; the optimization terminated because the "  \
+         "relative change in the solution estimate is less than that "         \
+         "specified by the parameter xtol. To try to get more accuracy one "   \
+         "may decrease xtol. If xtol is very small already, it is an "         \
+         "indication that no more significant progress can be made. It's "     \
+         "possible the approximate feasible solution is optimal, but perhaps " \
+         "the stopping tests cannot be satisfied because of degeneracy, "      \
+         "ill-conditioning or bad scaling.");                                  \
+  MACRO (KTR_RC_FEAS_NO_IMPROVE,                                               \
+         "Primal feasible solution estimate cannot be improved; desired "      \
+         "accuracy in dual feasibility could not be achieved. No further "     \
+         "progress can be made. It's possible the approximate feasible "       \
+         "solution is optimal, but perhaps the stopping tests cannot be "      \
+         "satisfied because of degeneracy, ill-conditioning or bad scaling."); \
+  MACRO (KTR_RC_FEAS_FTOL,                                                     \
+         "Primal feasible solution; the optimization terminated because the "  \
+         "relative change in the objective function is less than that "        \
+         "specified by the parameter ftol for ftol_iters consecutive "         \
+         "iterations. To try to get more accuracy one may decrease ftol "      \
+         "and/or increase ftol_iters. If ftol is very small already, it is "   \
+         "an indication that no more significant progress can be made. It's "  \
+         "possible the approximate feasible solution is optimal, but perhaps " \
+         "the stopping tests cannot be satisfied because of degeneracy, "      \
+         "ill-conditioning or bad scaling.");                                  \
   MACRO (KTR_RC_USER_TERMINATION, "Knitro has been terminated by the user.")
 
   // TODO: investigate the following error code:

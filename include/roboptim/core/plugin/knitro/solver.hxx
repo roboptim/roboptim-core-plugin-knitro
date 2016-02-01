@@ -437,7 +437,18 @@ namespace roboptim
     {
       boost::filesystem::path logdir (
         boost::get<std::string> (it_name->second.value));
-      boost::filesystem::create_directory (logdir);
+      if (not boost::filesystem::is_directory (logdir))
+      {
+        try
+        {
+          boost::filesystem::create_directory (logdir);
+        }
+        catch (const boost::filesystem::filesystem_error& e)
+        {
+          std::cerr << "Error when creating log directory. " << e.what ()
+                    << std::endl;
+        }
+      }
     }
   }
 

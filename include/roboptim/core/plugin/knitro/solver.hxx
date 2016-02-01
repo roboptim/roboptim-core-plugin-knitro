@@ -381,16 +381,12 @@ namespace roboptim
     }
 
     // initial point
-    argument_t xInitial (n);
-    if (pb.startingPoint ())
-      xInitial = *pb.startingPoint ();
-    else
-      xInitial.setZero ();
+    argument_t xInitial = initialArgument ();
 
     // sparsity pattern
     Eigen::VectorXi jacIndexVars;
     Eigen::VectorXi jacIndexCons;
-    int nnzJ = getSparsityPattern (jacIndexVars, jacIndexCons, n, m);
+    int nnzJ = getSparsityPattern (jacIndexVars, jacIndexCons, n, m, xInitial);
     int nnzH = 0;
 
     nStatus =
@@ -492,6 +488,38 @@ namespace roboptim
       KTR_get_constraint_values (knitro_, res.constraints.data ());
     }
     res.value = obj;
+  }
+
+  template <typename T>
+  typename KNITROSolver<T>::argument_t KNITROSolver<T>::initialArgument () const
+  {
+    const problem_t& pb = this->problem ();
+    size_type n = pb.function ().inputSize ();
+    argument_t x (n);
+
+    if (pb.startingPoint ())
+      x = *pb.startingPoint ();
+    else
+    {
+      for (typename vector_t::Index i = 0; i < n; ++i)
+      {
+        // if constraint is in an interval, evaluate at middle.
+        if (pb.argumentBounds ()[i].first != Function::infinity () &&
+            pb.argumentBounds ()[i].second != Function::infinity ())
+          x[i] =
+            (pb.argumentBounds ()[i].second - pb.argumentBounds ()[i].first) /
+            2.;
+        // otherwise use the non-infinite bound, or 0
+        else if (pb.argumentBounds ()[i].first != Function::infinity ())
+          x[i] = pb.argumentBounds ()[i].first;
+        else if (pb.argumentBounds ()[i].second != Function::infinity ())
+          x[i] = pb.argumentBounds ()[i].second;
+        else
+          x[i] = 0.;
+      }
+    }
+
+    return x;
   }
 
   template <typename T>

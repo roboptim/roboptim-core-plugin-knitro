@@ -136,9 +136,15 @@ namespace roboptim
     /// \param jacIndexCons indices for constraints (rows).
     /// \param n input size.
     /// \param m output size.
+    /// \param x initial x (used only in the sparse case).
     /// \return number of nonzeros in the Jacobian matrix.
     int getSparsityPattern (Eigen::VectorXi& jacIndexVars,
-                            Eigen::VectorXi& jacIndexCons, int n, int m) const;
+                            Eigen::VectorXi& jacIndexCons, int n, int m,
+                            const argument_t& x) const;
+
+    /// \brief Get the starting point, or generate a proper one.
+    /// \return starting point.
+    argument_t initialArgument () const;
 
   private:
     /// \brief Per-iteration callback.

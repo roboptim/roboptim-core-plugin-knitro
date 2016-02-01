@@ -310,6 +310,11 @@ namespace roboptim
     int m = static_cast<int> (m_);
 
     int objType = KTR_OBJTYPE_GENERAL;
+    if (pb.function ().template asType<linearFunction_t> ())
+      objType = KTR_OBJTYPE_LINEAR;
+    else if (pb.function ().template asType<quadraticFunction_t> ())
+      objType = KTR_OBJTYPE_QUADRATIC;
+
     int objGoal = KTR_OBJGOAL_MINIMIZE;
 
     // bounds and constraints type
@@ -343,8 +348,12 @@ namespace roboptim
 
       for (int j = 0; j < (*it)->outputSize (); j++)
       {
-        // FIXME: dispatch linear constraints here
         cType[offset + j] = KTR_CONTYPE_GENERAL;
+        if ((*it)->template asType<linearFunction_t> ())
+          objType = KTR_CONTYPE_LINEAR;
+        else if ((*it)->template asType<quadraticFunction_t> ())
+          objType = KTR_CONTYPE_QUADRATIC;
+
         if (pb.boundsVector ()[i][j].first == -Function::infinity ())
           cLoBnds[offset + j] = -KTR_INFBOUND;
         else

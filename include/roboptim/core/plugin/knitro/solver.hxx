@@ -463,7 +463,7 @@ namespace roboptim
 
     const std::string& logmode =
       boost::get<std::string> (it_file->second.value);
-    if (logmode != "file" and logmode != "both") return;
+    if (logmode != "file" && logmode != "both") return;
 
     it_name = params.find ("knitro.outdir");
     if (it_name != params.end ())

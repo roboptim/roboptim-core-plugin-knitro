@@ -33,7 +33,7 @@ namespace roboptim
   class IgnoreStream
   {
   public:
-    IgnoreStream (FILE* file) : file_ (file), fd_ (-1)
+    IgnoreStream (FILE* file) : file_ (file), null_ (0), fd_ (-1)
     {
     }
 
@@ -49,7 +49,7 @@ namespace roboptim
       {
         // Redirect to /dev/null
         fd_ = dup (fileno (file_));
-        freopen ("/dev/null", "w", file_);
+        null_ = freopen ("/dev/null", "w", file_);
       }
     }
 
@@ -63,11 +63,13 @@ namespace roboptim
         FILE* fbk = fdopen (fd_, "w");
         *file_ = *fbk;
         fd_ = -1;
+        null_ = 0;
       }
     }
 
   private:
     FILE* file_;
+    FILE* null_;
     int fd_;
   };
 

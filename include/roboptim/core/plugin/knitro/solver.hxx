@@ -84,13 +84,9 @@ namespace roboptim
   {
     typedef KNITROSolver<T> solver_t;
     typedef typename solver_t::argument_t argument_t;
-    typedef typename solver_t::gradient_t gradient_t;
-    typedef typename solver_t::jacobian_t jacobian_t;
     typedef typename solver_t::result_t result_t;
     typedef
       typename solver_t::problem_t::constraints_t::const_iterator iterator_t;
-    typedef
-      typename solver_t::differentiableFunction_t differentiableFunction_t;
 
     if (!userParams)
     {
@@ -122,33 +118,11 @@ namespace roboptim
     // evaluate cost gradient and constraints jacobian
     else if (evalRequestCode == KTR_RC_EVALGA)
     {
-      Eigen::Map<gradient_t> objGrad_ (objGrad, n);
-
-      // cost gradient
-      const differentiableFunction_t* df = 0;
-      if (solver->problem ()
-            .function ()
-            .template asType<differentiableFunction_t> ())
-      {
-        df = solver->problem ().function ().castInto<DifferentiableFunction> ();
-        objGrad_ = df->gradient (x_);
-      }
+      // objective gradient
+      evalGradObj (objGrad, x_, solver);
 
       // constraints jacobian
-      ptrdiff_t idx = 0;
-      df = 0;
-      Eigen::Map<jacobian_t> jacobianBuf (jac, m, n);
-      for (iterator_t it = solver->problem ().constraints ().begin ();
-           it != solver->problem ().constraints ().end (); ++it)
-      {
-        if ((*it)->template asType<differentiableFunction_t> ())
-        {
-          df = (*it)->castInto<differentiableFunction_t> ();
-          df->jacobian (jacobianBuf.block (idx, 0, (*it)->outputSize (), n),
-                        x_);
-          idx += (*it)->outputSize ();
-        }
-      }
+      evalJacobian (jac, x_, solver);
     }
     else
     {
@@ -160,7 +134,12 @@ namespace roboptim
 
   template <typename T>
   KNITROSolver<T>::KNITROSolver (const problem_t& problem)
-    : solver_t (problem), solverState_ (problem), waitTime_ (10), knitro_ ()
+    : solver_t (problem),
+      n_ (problem.function ().inputSize ()),
+      m_ (problem.constraintsOutputSize ()),
+      solverState_ (problem),
+      waitTime_ (10),
+      knitro_ ()
   {
     initializeKnitro ();
     initializeParameters ();
@@ -325,10 +304,10 @@ namespace roboptim
     const problem_t& pb = this->problem ();
 
     // number of variables
-    int n = static_cast<int> (pb.function ().inputSize ());
+    int n = static_cast<int> (n_);
 
     // number of constraints
-    int m = static_cast<int> (pb.constraintsOutputSize ());
+    int m = static_cast<int> (m_);
 
     int objType = KTR_OBJTYPE_GENERAL;
     int objGoal = KTR_OBJGOAL_MINIMIZE;
@@ -475,16 +454,13 @@ namespace roboptim
                                     const vector_t& lambda,
                                     const result_t& obj) const
   {
-    size_type n = x.size ();
-    size_type m = lambda.size () - n;
-
     res.x = x;
-    res.lambda.resize (n + m);
-    res.lambda.segment (0, n) = lambda.segment (m, n);
-    if (m > 0)
+    res.lambda.resize (n_ + m_);
+    res.lambda.segment (0, n_) = lambda.segment (m_, n_);
+    if (m_ > 0)
     {
-      res.lambda.segment (n, m) = lambda.segment (0, m);
-      res.constraints.resize (m);
+      res.lambda.segment (n_, m_) = lambda.segment (0, m_);
+      res.constraints.resize (m_);
       KTR_get_constraint_values (knitro_, res.constraints.data ());
     }
     res.value = obj;
@@ -494,14 +470,13 @@ namespace roboptim
   typename KNITROSolver<T>::argument_t KNITROSolver<T>::initialArgument () const
   {
     const problem_t& pb = this->problem ();
-    size_type n = pb.function ().inputSize ();
-    argument_t x (n);
+    argument_t x (n_);
 
     if (pb.startingPoint ())
       x = *pb.startingPoint ();
     else
     {
-      for (typename vector_t::Index i = 0; i < n; ++i)
+      for (typename vector_t::Index i = 0; i < n_; ++i)
       {
         // if constraint is in an interval, evaluate at middle.
         if (pb.argumentBounds ()[i].first != Function::infinity () &&
@@ -545,6 +520,18 @@ namespace roboptim
   typename KNITROSolver<T>::solverState_t& KNITROSolver<T>::solverState () const
   {
     return solverState_;
+  }
+
+  template <typename T>
+  typename KNITROSolver<T>::size_type KNITROSolver<T>::inputSize () const
+  {
+    return n_;
+  }
+
+  template <typename T>
+  typename KNITROSolver<T>::size_type KNITROSolver<T>::outputSize () const
+  {
+    return m_;
   }
 } // end of namespace roboptim
 

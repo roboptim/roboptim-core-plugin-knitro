@@ -18,13 +18,68 @@
 #include "roboptim/core/plugin/knitro/solver.hh"
 
 #include <roboptim/core/function.hh>
+#include <roboptim/core/differentiable-function.hh>
 
 namespace roboptim
 {
   template <>
+  inline void evalGradObj (
+    double* const objGrad,
+    typename GenericDifferentiableFunction<EigenMatrixDense>::const_argument_ref x,
+    const KNITROSolver<EigenMatrixDense>* solver)
+  {
+    typedef KNITROSolver<EigenMatrixDense> solver_t;
+    typedef typename solver_t::problem_t problem_t;
+    typedef typename solver_t::differentiableFunction_t differentiableFunction_t;
+    typedef typename solver_t::gradient_t gradient_t;
+
+    const problem_t& pb = solver->problem ();
+    Eigen::Map<gradient_t> objGrad_ (objGrad, solver->inputSize ());
+
+    const differentiableFunction_t* df = 0;
+    if (pb.function ().asType<differentiableFunction_t> ())
+    {
+      df = pb.function ().castInto<differentiableFunction_t> ();
+      df->gradient (objGrad_, x);
+    }
+  }
+
+  template <>
+  inline void evalJacobian (
+    double* const jac,
+    typename GenericDifferentiableFunction<EigenMatrixDense>::const_argument_ref x,
+    const KNITROSolver<EigenMatrixDense>* solver)
+  {
+    typedef KNITROSolver<EigenMatrixDense> solver_t;
+    typedef typename solver_t::problem_t problem_t;
+    typedef typename solver_t::jacobian_t jacobian_t;
+    typedef typename solver_t::differentiableFunction_t differentiableFunction_t;
+    typedef typename problem_t::constraints_t::const_iterator iterator_t;
+
+    const problem_t& pb = solver->problem ();
+    int n = static_cast<int> (solver->inputSize ());
+    int m = static_cast<int> (solver->outputSize ());
+
+    ptrdiff_t idx = 0;
+    const differentiableFunction_t* df = 0;
+    Eigen::Map<jacobian_t> jacobianBuf (jac, m, n);
+    for (iterator_t it = pb.constraints ().begin ();
+         it != pb.constraints ().end (); ++it)
+    {
+      if ((*it)->asType<differentiableFunction_t> ())
+      {
+        df = (*it)->castInto<differentiableFunction_t> ();
+        df->jacobian (jacobianBuf.block (idx, 0, df->outputSize (),
+              df->inputSize ()), x);
+        idx += (*it)->outputSize ();
+      }
+    }
+  }
+
+  template <>
   int KNITROSolver<EigenMatrixDense>::getSparsityPattern (
-    Eigen::VectorXi& jacIndexVars, Eigen::VectorXi& jacIndexCons, int n,
-    int m) const
+    Eigen::VectorXi& jacIndexVars, Eigen::VectorXi& jacIndexCons, int n, int m,
+    const argument_t&) const
   {
     const int nnz = n * m;
     jacIndexVars.resize (nnz);
@@ -33,7 +88,8 @@ namespace roboptim
     int k = 0;
 
     // If dense RobOptim jacobian matrices are column-major:
-    if (GenericFunctionTraits<traits_t>::StorageOrder == Eigen::ColMajor)
+    if (GenericFunctionTraits<EigenMatrixDense>::StorageOrder ==
+        Eigen::ColMajor)
     {
       for (int j = 0; j < n; j++) // col
         for (int i = 0; i < m; i++) // row

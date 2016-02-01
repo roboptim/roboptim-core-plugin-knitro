@@ -31,6 +31,8 @@
 
 namespace roboptim
 {
+  template <typename T> class KNITROSolver;
+
   /// \brief KNITRO iteration callback.
   /// \tparam T matrix type.
   template <typename T>
@@ -49,6 +51,26 @@ namespace roboptim
                        double* const c, double* const objGrad,
                        double* const jac, double* const hessian,
                        double* const hessVector, void* userParams);
+
+  /// \brief Helper to compute the objective's gradient.
+  /// \tparam T matrix type.
+  /// \param objGrad raw buffer to the objective's gradient.
+  /// \param x argument vector.
+  /// \param solver KNITRO solver.
+  template <typename T>
+  void evalGradObj (double* const objGrad,
+                    typename GenericFunction<T>::const_argument_ref x,
+                    const KNITROSolver<T>* solver);
+
+  /// \brief Helper to compute blocks of the Jacobian matrix.
+  /// \tparam T matrix type.
+  /// \param jac raw buffer to the Jacobian matrix.
+  /// \param x argument vector.
+  /// \param solver KNITRO solver.
+  template <typename T>
+  void evalJacobian (double* const jac,
+                     typename GenericFunction<T>::const_argument_ref x,
+                     const KNITROSolver<T>* solver);
 
   /// \addtogroup roboptim_solver
   /// @{
@@ -112,6 +134,9 @@ namespace roboptim
     /// \brief Get the current solver state.
     solverState_t& solverState () const;
 
+    size_type outputSize () const;
+    size_type inputSize () const;
+
   private:
     /// \brief Create the log directory.
     /// KNITRO does not create it if it does not exist.
@@ -147,6 +172,12 @@ namespace roboptim
     argument_t initialArgument () const;
 
   private:
+    /// \brief Input size.
+    size_type n_;
+
+    /// \brief Output size.
+    size_type m_;
+
     /// \brief Per-iteration callback.
     callback_t callback_;
 

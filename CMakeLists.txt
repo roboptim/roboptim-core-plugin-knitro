@@ -47,9 +47,8 @@ ENDIF()
 SET(BOOST_COMPONENTS filesystem system unit_test_framework)
 SEARCH_FOR_BOOST()
 
-# Search for Ipopt.
-ADD_REQUIRED_DEPENDENCY("roboptim-core >= 0.5")
-MESSAGE(STATUS "ROBOPTIM_CORE_PLUGINDIR: " ${ROBOPTIM_CORE_PLUGINDIR})
+# Search for roboptim-core.
+ADD_REQUIRED_DEPENDENCY("roboptim-core >= 3.2")
 
 # Look for KNITRO.
 FIND_PATH(KNITRO_DIR include/knitro.h PATHS /usr /usr/local /opt/KNITRO)

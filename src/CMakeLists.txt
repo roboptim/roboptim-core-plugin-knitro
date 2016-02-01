@@ -14,6 +14,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with roboptim-core.  If not, see <http://www.gnu.org/licenses/>.
 
+# Define the directory where plug-ins will be installed.
+GET_FILENAME_COMPONENT(RELPLUGINDIR ${ROBOPTIM_CORE_PLUGINDIR} NAME)
+SET(PLUGINDIR ${CMAKE_INSTALL_LIBDIR}/${RELPLUGINDIR})
+
 MACRO(KNITRO_PLUGIN NAME)
     ADD_LIBRARY(roboptim-core-plugin-${NAME} MODULE ${NAME}.cc ${HEADERS})
     PKG_CONFIG_USE_DEPENDENCY(roboptim-core-plugin-${NAME} roboptim-core)
@@ -22,7 +26,7 @@ MACRO(KNITRO_PLUGIN NAME)
 
     SET_TARGET_PROPERTIES(roboptim-core-plugin-${NAME} PROPERTIES
       PREFIX ""
-      SOVERSION 3.2.0)
+      SOVERSION 3 VERSION 3.2.0)
     INSTALL(TARGETS roboptim-core-plugin-${NAME}
       DESTINATION ${ROBOPTIM_CORE_PLUGINDIR})
 ENDMACRO()

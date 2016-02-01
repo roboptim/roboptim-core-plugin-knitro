@@ -24,8 +24,11 @@
 # include <stdexcept>
 
 # include <boost/variant.hpp>
+# include <boost/scoped_ptr.hpp>
 # include <boost/filesystem.hpp>
 # include <boost/static_assert.hpp>
+# include <boost/date_time/posix_time/posix_time.hpp>
+# include <boost/thread/thread.hpp>
 
 # include <knitro.h>
 
@@ -158,8 +161,9 @@ namespace roboptim
 
   template <typename T>
   KNITROSolver<T>::KNITROSolver (const problem_t& problem)
-    : solver_t (problem), solverState_ (problem), knitro_ ()
+    : solver_t (problem), solverState_ (problem), waitTime_ (10), knitro_ ()
   {
+    initializeKnitro ();
     initializeParameters ();
   }
 
@@ -167,6 +171,40 @@ namespace roboptim
   KNITROSolver<T>::~KNITROSolver ()
   {
     KTR_free (&knitro_);
+  }
+
+  template <typename T>
+  void KNITROSolver<T>::initializeKnitro ()
+  {
+    IgnoreStream ignoreCerr (stderr);
+
+    unsigned ntry = 0;
+    while (!knitro_)
+    {
+      // Note: KNITRO spamms cerr with errors. We only want to display the
+      // first message.
+      if (ntry > 0) ignoreCerr.start ();
+
+      knitro_ = KTR_new ();
+
+      if (ntry > 0) ignoreCerr.end ();
+
+      if (!knitro_)
+      {
+        if (ntry == 0)
+        {
+          std::cerr << "Waiting for KNITRO license...";
+        }
+        else if (ntry % 100 == 0)
+        {
+          std::cerr << ".";
+        }
+        ntry++;
+        boost::this_thread::sleep (boost::posix_time::milliseconds (waitTime_));
+      }
+    }
+    if (ntry > 0)
+      std::cerr << std::endl;
   }
 
 #define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)     \
@@ -181,17 +219,12 @@ namespace roboptim
   {
     this->parameters_.clear ();
 
-    // KNITRO specific.
-    // Much more options are available for Knitro see Knitro documentation
-
-    if (!knitro_) knitro_ = KTR_new ();
-    if (!knitro_) throw std::runtime_error ("failed to initialize KNITRO");
-
     if (KTR_set_func_callback (knitro_, &computeCallback<T>))
       throw std::runtime_error ("failed to set evaluation callback");
     if (KTR_set_grad_callback (knitro_, &computeCallback<T>))
       throw std::runtime_error ("failed to set gradient callback");
 
+    // Much more options are available for Knitro see Knitro documentation
     //  Output
     DEFINE_PARAMETER ("knitro.outlev", "output verbosity level", 4);
     DEFINE_PARAMETER ("knitro.outmode",

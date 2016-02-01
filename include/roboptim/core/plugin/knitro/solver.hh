@@ -127,6 +127,10 @@ namespace roboptim
     void fillResult (R& res, const argument_t& x, const vector_t& lambda,
                      const result_t& obj) const;
 
+    /// \brief Initialize the KNITRO solver.
+    /// This will loop until a proper license is obtained.
+    void initializeKnitro ();
+
   private:
     /// \brief Per-iteration callback.
     callback_t callback_;
@@ -136,6 +140,11 @@ namespace roboptim
 
     /// \brief Map from strings to KNITRO enums.
     std::map<std::string, int> stringToEnum_;
+
+    /// \brief Time to wait between 2 retries of the KNITRO initialization, in
+    /// milliseconds.
+    /// This is useful when sharing a single network license...
+    unsigned waitTime_;
 
     /// \brief KNITRO solver context.
     KTR_context* knitro_;

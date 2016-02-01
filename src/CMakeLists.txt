@@ -3,7 +3,7 @@ MACRO(KNITRO_PLUGIN NAME)
     ADD_LIBRARY(roboptim-core-plugin-${NAME} MODULE ${NAME}.cc ${HEADERS})
     PKG_CONFIG_USE_DEPENDENCY(roboptim-core-plugin-${NAME} roboptim-core)
     TARGET_LINK_LIBRARIES(roboptim-core-plugin-${NAME} knitro)
-    TARGET_LINK_LIBRARIES(roboptim-core-plugin-${NAME} boost_filesystem)
+    TARGET_LINK_LIBRARIES(roboptim-core-plugin-${NAME} boost_filesystem boost_thread)
 
     SET_TARGET_PROPERTIES(roboptim-core-plugin-${NAME} PROPERTIES
       PREFIX ""

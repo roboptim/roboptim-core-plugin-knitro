@@ -16,18 +16,61 @@
 // along with roboptim.  If not see <http://www.gnu.org/licenses/>.
 
 #ifndef ROBOPTIM_CORE_PLUGIN_KNITRO_UTIL_HH
-#define ROBOPTIM_CORE_PLUGIN_KNITRO_UTIL_HH
+# define ROBOPTIM_CORE_PLUGIN_KNITRO_UTIL_HH
 
-#include <string>
-#include <map>
+# include <string>
+# include <map>
+# include <cstdio>
 
-#include <boost/assign/list_of.hpp>
-#include <boost/preprocessor/stringize.hpp>
+# include <boost/assign/list_of.hpp>
+# include <boost/preprocessor/stringize.hpp>
 
-#include <knitro.h>
+# include <knitro.h>
 
 namespace roboptim
 {
+  /// \brief Ignore standard output (cout or cerr).
+  class IgnoreStream
+  {
+  public:
+    IgnoreStream (FILE* file) : file_ (file), fd_ (-1)
+    {
+    }
+
+    ~IgnoreStream ()
+    {
+      end ();
+    }
+
+    /// \brief Start redirection.
+    void start ()
+    {
+      if (file_ && fd_ < 0)
+      {
+        // Redirect to /dev/null
+        fd_ = dup (fileno (file_));
+        freopen ("/dev/null", "w", file_);
+      }
+    }
+
+    /// \brief End redirection.
+    void end ()
+    {
+      if (fd_ >= 0)
+      {
+        // Redirect back to initial output
+        fclose (file_);
+        FILE* fbk = fdopen (fd_, "w");
+        *file_ = *fbk;
+        fd_ = -1;
+      }
+    }
+
+  private:
+    FILE* file_;
+    int fd_;
+  };
+
   /// \brief Return a map from the string representation of KNITRO options to
   /// their actual value (enums).
   /// That way, users can provide the option as a string, rather than needing to

@@ -385,6 +385,16 @@ namespace roboptim
                         cUpBnds.data (), nnzJ, jacIndexVars.data (),
                         jacIndexCons.data (), nnzH, 0, 0, xInitial.data (), 0);
 
+    if (callback ())
+    {
+      // Initial iterate does not trigger KTR_set_newpt_callback
+      int status = 0;
+      double obj = 0;
+      KTR_get_solution (knitro_, &status, &obj, 0, 0);
+      iterationCallback<T> (knitro_, n, m, nnzJ, xInitial.data (), 0, obj, 0, 0,
+                            0, (void*)this);
+    }
+
     argument_t x (n);
     vector_t lambda (m + n);
     result_t obj (1);

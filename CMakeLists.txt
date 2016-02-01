@@ -62,6 +62,13 @@ INCLUDE_DIRECTORIES("${KNITRO_DIR}/include")
 LINK_DIRECTORIES("${KNITRO_DIR}/lib/gcc41-sequential")
 
 ADD_SUBDIRECTORY(src)
-ADD_SUBDIRECTORY(tests)
+
+OPTION(DISABLE_TESTS "Disable test programs" OFF)
+IF(NOT DISABLE_TESTS)
+  ADD_SUBDIRECTORY(tests)
+ELSE()
+  MESSAGE(WARNING
+    "Tests should only be disabled for speficic cases. Do it at your own risk.")
+ENDIF()
 
 SETUP_PROJECT_FINALIZE()

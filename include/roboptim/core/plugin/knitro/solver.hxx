@@ -26,7 +26,6 @@
 # include <boost/variant.hpp>
 # include <boost/scoped_ptr.hpp>
 # include <boost/filesystem.hpp>
-# include <boost/static_assert.hpp>
 # include <boost/date_time/posix_time/posix_time.hpp>
 # include <boost/thread/thread.hpp>
 

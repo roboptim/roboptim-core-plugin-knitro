@@ -17,6 +17,8 @@
 
 #include "roboptim/core/plugin/knitro/solver.hh"
 
+#include <roboptim/core/function.hh>
+
 namespace roboptim
 {
   template <>
@@ -24,21 +26,33 @@ namespace roboptim
     Eigen::VectorXi& jacIndexVars, Eigen::VectorXi& jacIndexCons, int n,
     int m) const
   {
-    // FIXME: this depends on RowMajor/ColMajor
-    BOOST_STATIC_ASSERT (Eigen::ROBOPTIM_STORAGE_ORDER == Eigen::ColMajor);
-
     const int nnz = n * m;
     jacIndexVars.resize (nnz);
     jacIndexCons.resize (nnz);
 
     int k = 0;
-    for (int i = 0; i < n; i++)
-      for (int j = 0; j < m; j++)
-      {
-        jacIndexVars[k] = i;
-        jacIndexCons[k] = j;
-        k++;
-      }
+
+    // If dense RobOptim jacobian matrices are column-major:
+    if (GenericFunctionTraits<traits_t>::StorageOrder == Eigen::ColMajor)
+    {
+      for (int j = 0; j < n; j++) // col
+        for (int i = 0; i < m; i++) // row
+        {
+          jacIndexCons[k] = i; // row
+          jacIndexVars[k] = j; // col
+          k++;
+        }
+    }
+    else // row-major
+    {
+      for (int i = 0; i < m; i++) // row
+        for (int j = 0; j < n; j++) // col
+        {
+          jacIndexCons[k] = i; // row
+          jacIndexVars[k] = j; // col
+          k++;
+        }
+    }
 
     return nnz;
   }

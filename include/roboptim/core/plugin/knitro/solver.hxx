@@ -213,7 +213,7 @@ namespace roboptim
 
     // Gradient and hessian used
     DEFINE_PARAMETER ("knitro.gradopt", "type of gradient method used",
-                      std::string ("GRADOPT_FORWARD"));
+                      std::string ("GRADOPT_EXACT"));
     DEFINE_PARAMETER ("knitro.hessopt", "type of hessian method used",
                       std::string ("HESSOPT_BFGS"));
 
@@ -224,8 +224,7 @@ namespace roboptim
                       "desired convergence tolerance (relative)", 1e-6);
     DEFINE_PARAMETER ("knitro.feastol", "desired threshold for the feasibility",
                       1e-6);
-    DEFINE_PARAMETER ("knitro.xtol",
-                      "desired threshold for the constraint violation", 1e-5);
+    DEFINE_PARAMETER ("knitro.xtol", "tolerance on arguments", 1e-15);
 
     //  Barrier parameter
     DEFINE_PARAMETER ("knitro.bar_initmu", "barrier initial mu", 1e-1);

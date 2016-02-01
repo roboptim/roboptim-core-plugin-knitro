@@ -451,10 +451,14 @@ namespace roboptim
     size_type m = lambda.size () - n;
 
     res.x = x;
-    res.lambda.segment (0, n) = lambda.segment (m, m + n);
-    res.lambda.segment (n, n + m) = lambda.segment (0, m);
-    res.constraints.resize (m);
-    KTR_get_constraint_values (knitro_, res.constraints.data ());
+    res.lambda.resize (n + m);
+    res.lambda.segment (0, n) = lambda.segment (m, n);
+    if (m > 0)
+    {
+      res.lambda.segment (n, m) = lambda.segment (0, m);
+      res.constraints.resize (m);
+      KTR_get_constraint_values (knitro_, res.constraints.data ());
+    }
     res.value = obj;
   }
 

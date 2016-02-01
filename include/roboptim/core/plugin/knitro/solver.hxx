@@ -138,6 +138,7 @@ namespace roboptim
       n_ (problem.function ().inputSize ()),
       m_ (problem.constraintsOutputSize ()),
       solverState_ (problem),
+      objGrad_ (n_),
       waitTime_ (10),
       knitro_ ()
   {
@@ -519,6 +520,12 @@ namespace roboptim
   typename KNITROSolver<T>::solverState_t& KNITROSolver<T>::solverState () const
   {
     return solverState_;
+  }
+
+  template <typename T>
+  typename KNITROSolver<T>::gradient_t& KNITROSolver<T>::objGrad () const
+  {
+    return objGrad_;
   }
 
   template <typename T>

@@ -26,6 +26,8 @@
 
 # include <roboptim/core/portability.hh>
 # include <roboptim/core/differentiable-function.hh>
+# include <roboptim/core/linear-function.hh>
+# include <roboptim/core/quadratic-function.hh>
 # include <roboptim/core/solver.hh>
 # include <roboptim/core/util.hh>
 
@@ -91,6 +93,8 @@ namespace roboptim
     typedef typename solver_t::parameters_t parameters_t;
 
     typedef GenericDifferentiableFunction<T> differentiableFunction_t;
+    typedef GenericLinearFunction<T> linearFunction_t;
+    typedef GenericQuadraticFunction<T> quadraticFunction_t;
 
     typedef typename problem_t::function_t function_t;
     typedef typename function_t::matrix_t matrix_t;
@@ -134,8 +138,14 @@ namespace roboptim
     /// \brief Get the current solver state.
     solverState_t& solverState () const;
 
+    /// \brief Output size of the problem.
     size_type outputSize () const;
+
+    /// \brief Input size of the problem.
     size_type inputSize () const;
+
+    /// \brief Get the buffer for the gradient of the objective function.
+    gradient_t& objGrad () const;
 
   private:
     /// \brief Create the log directory.
@@ -183,6 +193,9 @@ namespace roboptim
 
     /// \brief Current state of the solver (used by the callback function).
     mutable solverState_t solverState_;
+
+    /// \brief Objective gradient buffer.
+    mutable gradient_t objGrad_;
 
     /// \brief Map from strings to KNITRO enums.
     std::map<std::string, int> stringToEnum_;

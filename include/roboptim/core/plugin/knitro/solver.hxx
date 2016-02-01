@@ -330,8 +330,6 @@ namespace roboptim
 
     // number of constraints
     int m = static_cast<int> (pb.constraintsOutputSize ());
-    int nnzJ = n * m;
-    int nnzH = 0;
 
     int objType = KTR_OBJTYPE_GENERAL;
     int objGoal = KTR_OBJGOAL_MINIMIZE;
@@ -390,20 +388,11 @@ namespace roboptim
     else
       xInitial.setZero ();
 
-    // sparsity pattern (dense here)
-    Eigen::VectorXi jacIndexVars (nnzJ);
-    Eigen::VectorXi jacIndexCons (nnzJ);
-
-    // FIXME: this depends on RowMajor/ColMajor
-    BOOST_STATIC_ASSERT (Eigen::ROBOPTIM_STORAGE_ORDER == Eigen::ColMajor);
-    int k = 0;
-    for (int i = 0; i < n; i++)
-      for (int j = 0; j < m; j++)
-      {
-        jacIndexCons[k] = j;
-        jacIndexVars[k] = i;
-        k++;
-      }
+    // sparsity pattern
+    Eigen::VectorXi jacIndexVars;
+    Eigen::VectorXi jacIndexCons;
+    int nnzJ = getSparsityPattern (jacIndexVars, jacIndexCons, n, m);
+    int nnzH = 0;
 
     nStatus =
       KTR_init_problem (knitro_, n, objGoal, objType, xLoBnds.data (),

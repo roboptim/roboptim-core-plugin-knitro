@@ -17,6 +17,33 @@
 
 #include "roboptim/core/plugin/knitro/solver.hh"
 
+namespace roboptim
+{
+  template <>
+  int KNITROSolver<EigenMatrixDense>::getSparsityPattern (
+    Eigen::VectorXi& jacIndexVars, Eigen::VectorXi& jacIndexCons, int n,
+    int m) const
+  {
+    // FIXME: this depends on RowMajor/ColMajor
+    BOOST_STATIC_ASSERT (Eigen::ROBOPTIM_STORAGE_ORDER == Eigen::ColMajor);
+
+    const int nnz = n * m;
+    jacIndexVars.resize (nnz);
+    jacIndexCons.resize (nnz);
+
+    int k = 0;
+    for (int i = 0; i < n; i++)
+      for (int j = 0; j < m; j++)
+      {
+        jacIndexVars[k] = i;
+        jacIndexCons[k] = j;
+        k++;
+      }
+
+    return nnz;
+  }
+} // end of namespace roboptim
+
 extern "C" {
 using namespace roboptim;
 typedef KNITROSolver<EigenMatrixDense> knitroSolver_t;

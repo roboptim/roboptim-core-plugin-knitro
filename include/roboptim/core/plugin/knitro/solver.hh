@@ -131,6 +131,15 @@ namespace roboptim
     /// This will loop until a proper license is obtained.
     void initializeKnitro ();
 
+    /// \brief Get the sparsity pattern of the Jacobian matrix.
+    /// \param jacIndexVars indices for variables (columns).
+    /// \param jacIndexCons indices for constraints (rows).
+    /// \param n input size.
+    /// \param m output size.
+    /// \return number of nonzeros in the Jacobian matrix.
+    int getSparsityPattern (Eigen::VectorXi& jacIndexVars,
+                            Eigen::VectorXi& jacIndexCons, int n, int m) const;
+
   private:
     /// \brief Per-iteration callback.
     callback_t callback_;

@@ -26,14 +26,11 @@ SET(CONSTRAINT_TYPE_2 ::roboptim::GenericDifferentiableFunction)
 
 SET(SCHITTKOWSKI_PROBLEMS_FAIL
   2
-  13 14 17
-  20 24 25 28
-  32 34
-  47 48 49
-  50 55 56
-  60
-  71
-  71b
+  13
+  20 25
+  42
+  55
+  72
   )
 
 BUILD_SCHITTKOWSKI_PROBLEMS()

@@ -45,7 +45,7 @@ namespace roboptim
     /// \brief Start redirection.
     void start ()
     {
-      if (file_ && fd_ < 0)
+      if (!null_)
       {
         // Redirect to /dev/null
         fd_ = dup (fileno (file_));
@@ -56,13 +56,12 @@ namespace roboptim
     /// \brief End redirection.
     void end ()
     {
-      if (fd_ >= 0)
+      if (null_)
       {
         // Redirect back to initial output
-        fclose (file_);
+        fclose (null_);
         FILE* fbk = fdopen (fd_, "w");
         *file_ = *fbk;
-        fd_ = -1;
         null_ = 0;
       }
     }

@@ -140,7 +140,8 @@ namespace roboptim
       solverState_ (problem),
       objGrad_ (n_),
       jac_ (),
-      waitTime_ (10),
+      waitTime_ (1000),
+      maxRetries_ (300),
       knitro_ ()
   {
     initializeKnitro ();
@@ -159,12 +160,16 @@ namespace roboptim
     IgnoreStream ignoreCerr (stderr);
 
     unsigned ntry = 0;
-    while (!knitro_)
+    while (!knitro_ && ntry < maxRetries_)
     {
       // Note: KNITRO spamms cerr with errors. We only want to display the
       // first message.
       if (ntry > 0) ignoreCerr.start ();
 
+      // ** WARNING **
+      // KTR_new() returns a NULL pointer on error (e.g. no license), but does
+      // not free memory, so this actually leads to a memory leak in case of
+      // error!!
       knitro_ = KTR_new ();
 
       if (ntry > 0) ignoreCerr.end ();
@@ -175,7 +180,7 @@ namespace roboptim
         {
           std::cerr << "Waiting for KNITRO license...";
         }
-        else if (ntry % 100 == 0)
+        else
         {
           std::cerr << ".";
         }
@@ -185,6 +190,8 @@ namespace roboptim
     }
     if (ntry > 0)
       std::cerr << std::endl;
+    if (ntry == maxRetries_)
+      throw std::runtime_error ("could not instantiate KNITRO");
   }
 
 #define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)     \

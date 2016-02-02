@@ -212,6 +212,9 @@ namespace roboptim
     /// This is useful when sharing a single network license...
     unsigned waitTime_;
 
+    /// \brief Maximum number of retries (e.g. license error).
+    unsigned maxRetries_;
+
     /// \brief KNITRO solver context.
     KTR_context* knitro_;
   };

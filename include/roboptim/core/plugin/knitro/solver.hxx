@@ -158,7 +158,8 @@ namespace roboptim
       jac_ (),
       waitTime_ (1000),
       maxRetries_ (300),
-      knitro_ ()
+      knitro_ (0),
+      zlm_ (0)
   {
     initializeKnitro ();
     initializeParameters ();
@@ -168,26 +169,22 @@ namespace roboptim
   KNITROSolver<T>::~KNITROSolver ()
   {
     KTR_free (&knitro_);
+    ZLM_release_license (zlm_);
   }
 
   template <typename T>
   void KNITROSolver<T>::initializeKnitro ()
   {
-    IgnoreStream ignoreCerr (stderr);
+    zlm_ = ZLM_checkout_license ();
 
+    IgnoreStream ignoreCerr (stderr);
     unsigned ntry = 0;
     while (!knitro_ && ntry < maxRetries_)
     {
-      // Note: KNITRO spamms cerr with errors. We only want to display the
-      // first message.
+      // Try to obtain a license
+      // Note: we ignore error messages to avoid being spammed by KNITRO
       if (ntry > 0) ignoreCerr.start ();
-
-      // ** WARNING **
-      // KTR_new() returns a NULL pointer on error (e.g. no license), but does
-      // not free memory, so this actually leads to a memory leak in case of
-      // error!!
-      knitro_ = KTR_new ();
-
+      knitro_ = KTR_new_zlm (NULL, NULL, zlm_);
       if (ntry > 0) ignoreCerr.end ();
 
       if (!knitro_)
@@ -207,7 +204,8 @@ namespace roboptim
     if (ntry > 0)
       std::cerr << std::endl;
     if (ntry == maxRetries_)
-      throw std::runtime_error ("could not instantiate KNITRO");
+      throw std::runtime_error ("could not obtain a KNITRO license");
+
   }
 
 #define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)     \

@@ -216,7 +216,10 @@ namespace roboptim
     unsigned maxRetries_;
 
     /// \brief KNITRO solver context.
-    KTR_context* knitro_;
+    KTR_context_ptr knitro_;
+
+    /// \brief Ziena License Manager context.
+    ZLM_context_ptr zlm_;
   };
 
   /// @}

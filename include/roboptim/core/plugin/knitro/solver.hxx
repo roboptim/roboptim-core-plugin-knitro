@@ -500,13 +500,13 @@ namespace roboptim
       for (typename vector_t::Index i = 0; i < n_; ++i)
       {
         // if constraint is in an interval, evaluate at middle.
-        if (pb.argumentBounds ()[i].first != Function::infinity () &&
+        if (pb.argumentBounds ()[i].first != -Function::infinity () &&
             pb.argumentBounds ()[i].second != Function::infinity ())
           x[i] =
             (pb.argumentBounds ()[i].second - pb.argumentBounds ()[i].first) /
             2.;
         // otherwise use the non-infinite bound, or 0
-        else if (pb.argumentBounds ()[i].first != Function::infinity ())
+        else if (pb.argumentBounds ()[i].first != -Function::infinity ())
           x[i] = pb.argumentBounds ()[i].first;
         else if (pb.argumentBounds ()[i].second != Function::infinity ())
           x[i] = pb.argumentBounds ()[i].second;

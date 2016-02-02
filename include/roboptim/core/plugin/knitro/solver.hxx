@@ -29,6 +29,8 @@
 # include <boost/date_time/posix_time/posix_time.hpp>
 # include <boost/thread/thread.hpp>
 
+# include <Eigen/Core>
+
 # include <knitro.h>
 
 # include <roboptim/core/result.hh>
@@ -50,7 +52,7 @@ namespace roboptim
                          const double* const /* jac */, void* userParams)
   {
     typedef KNITROSolver<T> solver_t;
-    typedef typename solver_t::vector_t vector_t;
+    typedef typename solver_t::argument_t argument_t;
     typedef typename solver_t::solverState_t solverState_t;
 
     if (!userParams)
@@ -63,9 +65,23 @@ namespace roboptim
     if (!solver->callback ()) return 0;
 
     solverState_t& solverState = solver->solverState ();
-    solverState.x () = Eigen::Map<const vector_t> (x, n);
-    solverState.cost () = obj;
-    solverState.constraintViolation () = KTR_get_abs_feas_error (kc);
+    const Eigen::Map<const argument_t> map_x (x, n);
+    solverState.x () = map_x;
+
+    // First iteration does not provide cost and constraint violation
+    int iter = KTR_get_number_iters (kc);
+    if (iter > 0)
+    {
+      solverState.cost () = obj;
+      solverState.constraintViolation () = KTR_get_abs_feas_error (kc);
+    }
+    else
+    {
+      // Need to evaluate cost and violation for the callback
+      solverState.cost () = solver->problem ().function () (map_x)[0];
+      solverState.constraintViolation () =
+        solver->problem ().template constraintsViolation<Eigen::Infinity> (map_x);
+    }
 
     // call user-defined callback
     solver->callback () (solver->problem (), solverState);
@@ -394,11 +410,9 @@ namespace roboptim
 
     if (callback ())
     {
-      // Initial iterate does not trigger KTR_set_newpt_callback
-      int status = 0;
-      double obj = 0;
-      KTR_get_solution (knitro_, &status, &obj, 0, 0);
-      iterationCallback<T> (knitro_, n, m, nnzJ, xInitial.data (), 0, obj, 0, 0,
+      // Initial iterate does not trigger KTR_set_newpt_callback.
+      // Also, the objective is not yet available.
+      iterationCallback<T> (knitro_, n, m, nnzJ, xInitial.data (), 0, 0, 0, 0,
                             0, (void*)this);
     }
 

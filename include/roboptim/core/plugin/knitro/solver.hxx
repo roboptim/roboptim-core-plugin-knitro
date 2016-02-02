@@ -111,7 +111,7 @@ namespace roboptim
       for (iterator_t it = solver->problem ().constraints ().begin ();
            it != solver->problem ().constraints ().end (); ++it)
       {
-        constraintsBuf.segment (idx, (*it)->outputSize ()) = (*(*it)) (x_);
+        (*(*it)) (constraintsBuf.segment (idx, (*it)->outputSize ()), x_);
         idx += (*it)->outputSize ();
       }
     }

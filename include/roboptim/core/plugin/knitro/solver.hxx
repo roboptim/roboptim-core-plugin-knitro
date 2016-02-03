@@ -86,7 +86,19 @@ namespace roboptim
     // call user-defined callback
     solver->callback () (solver->problem (), solverState);
 
-    return 0;
+    // knitro.stop may have been unintentionally removed in the callback
+    bool stop_optim;
+    try
+    {
+      stop_optim = solverState.template getParameter<bool> ("knitro.stop");
+    }
+    catch (std::out_of_range&)
+    {
+      stop_optim = false;
+    }
+
+    // Terminate if asked by the user
+    return stop_optim? KTR_RC_USER_TERMINATION : 0;
   }
 
   template <typename T>
@@ -259,6 +271,8 @@ namespace roboptim
     // Miscellaneous
     DEFINE_PARAMETER ("knitro.par_numthreads",
                       "number of parallel threads to use", 1);
+    DEFINE_PARAMETER ("knitro.stop",
+                      "set to true to terminate the optimization", false);
 
     stringToEnum_ = knitroParameterMap ();
   }

@@ -253,8 +253,6 @@ namespace roboptim
                       std::string ("HESSOPT_BFGS"));
 
     //  Termination
-    DEFINE_PARAMETER ("knitro.maxit", "maximum number of iteration permitted",
-                      3000);
     DEFINE_PARAMETER ("knitro.opttol",
                       "desired convergence tolerance (relative)", 1e-6);
     DEFINE_PARAMETER ("knitro.feastol", "desired threshold for the feasibility",
@@ -273,6 +271,9 @@ namespace roboptim
                       "number of parallel threads to use", 1);
     DEFINE_PARAMETER ("knitro.stop",
                       "set to true to terminate the optimization", false);
+
+    // Shared parameters.
+    DEFINE_PARAMETER ("max-iterations", "maximum number of iterations", 3000);
 
     stringToEnum_ = knitroParameterMap ();
   }
@@ -294,6 +295,12 @@ namespace roboptim
         throw std::runtime_error ("failed to set solver callback");
     }
 
+    // Remap standardized parameters.
+    boost::apply_visitor
+      (KnitroParametersUpdater
+       (knitro_, "maxit", stringToEnum_), this->parameters_["max-iterations"].value);
+
+    // KNITRO parameters
     const std::string prefix = "knitro.";
     typedef const std::pair<const std::string, Parameter> const_iterator_t;
     BOOST_FOREACH (const_iterator_t& it, this->parameters_)

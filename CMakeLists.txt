@@ -43,6 +43,13 @@ IF(HAS_NO_UNDEFINED)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-undefined")
 ENDIF()
 
+# Look for KNITRO.
+FIND_PATH(KNITRO_DIR include/knitro.h PATHS /usr /usr/local /opt/KNITRO)
+MESSAGE(STATUS "KNITRO_DIR: " ${KNITRO_DIR})
+IF(NOT KNITRO_DIR)
+  MESSAGE(FATAL_ERROR "KNITRO has not been found")
+ENDIF()
+
 # OpenMP is required by KNITRO
 FIND_PACKAGE(OpenMP)
 IF(OpenMP_FOUND)
@@ -59,13 +66,6 @@ SEARCH_FOR_BOOST()
 
 # Search for roboptim-core.
 ADD_REQUIRED_DEPENDENCY("roboptim-core >= 3.2")
-
-# Look for KNITRO.
-FIND_PATH(KNITRO_DIR include/knitro.h PATHS /usr /usr/local /opt/KNITRO)
-MESSAGE(STATUS "KNITRO_DIR: " ${KNITRO_DIR})
-IF(NOT KNITRO_DIR)
-  MESSAGE(FATAL_ERROR "KNITRO has not been found")
-ENDIF()
 
 INCLUDE_DIRECTORIES("${KNITRO_DIR}/include")
 

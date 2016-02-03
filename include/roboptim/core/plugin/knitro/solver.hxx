@@ -83,11 +83,14 @@ namespace roboptim
         solver->problem ().template constraintsViolation<Eigen::Infinity> (map_x);
     }
 
+    // Initialize value for knitro.stop
+    bool stop_optim = false;
+    solverState.parameters ()["knitro.stop"].value = stop_optim;
+
     // call user-defined callback
     solver->callback () (solver->problem (), solverState);
 
     // knitro.stop may have been unintentionally removed in the callback
-    bool stop_optim;
     try
     {
       stop_optim = solverState.template getParameter<bool> ("knitro.stop");
@@ -269,13 +272,16 @@ namespace roboptim
     // Miscellaneous
     DEFINE_PARAMETER ("knitro.par_numthreads",
                       "number of parallel threads to use", 1);
-    DEFINE_PARAMETER ("knitro.stop",
-                      "set to true to terminate the optimization", false);
 
     // Shared parameters.
     DEFINE_PARAMETER ("max-iterations", "maximum number of iterations", 3000);
 
     stringToEnum_ = knitroParameterMap ();
+
+    // Initialize solver state
+    solverState_.parameters ()["knitro.stop"].value = false;
+    solverState_.parameters ()["knitro.stop"].description =
+      "whether to stop the optimization process";
   }
 
   template <typename T>

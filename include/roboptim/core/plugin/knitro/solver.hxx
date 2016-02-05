@@ -272,6 +272,10 @@ namespace roboptim
     // Miscellaneous
     DEFINE_PARAMETER ("knitro.par_numthreads",
                       "number of parallel threads to use", 1);
+    DEFINE_PARAMETER ("knitro.datacheck",
+                      "whether to perform more extensive data checks to look "
+                      "for errors in the problem input to Knitro",
+                      false);
 
     // Shared parameters.
     DEFINE_PARAMETER ("max-iterations", "maximum number of iterations", 3000);

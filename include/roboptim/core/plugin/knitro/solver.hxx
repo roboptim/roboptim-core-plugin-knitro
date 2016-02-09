@@ -220,7 +220,6 @@ namespace roboptim
       std::cerr << std::endl;
     if (ntry == maxRetries_)
       throw std::runtime_error ("could not obtain a KNITRO license");
-
   }
 
 #define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)     \
@@ -471,8 +470,6 @@ namespace roboptim
       default:
         throw std::runtime_error ("unknown KNITRO return code");
     }
-
-    KTR_free (&knitro_);
   }
 
 #undef SWITCH_ERROR

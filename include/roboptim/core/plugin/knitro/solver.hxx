@@ -338,7 +338,7 @@ namespace roboptim
 #define SWITCH_WARNING(NAME, WARNING)                 \
   case NAME:                                          \
   {                                                   \
-    ResultWithWarnings res (n, 1);                    \
+    Result res (n, 1);                                \
     fillResult (res, x, lambda, obj);                 \
     res.warnings.push_back (SolverWarning (WARNING)); \
     this->result_ = res;                              \
@@ -530,7 +530,9 @@ namespace roboptim
       res.lambda.segment (n_, m_) = lambda.segment (0, m_);
       res.constraints.resize (m_);
       KTR_get_constraint_values (knitro_, res.constraints.data ());
+      res.constraint_violation = KTR_get_abs_feas_error (knitro_);
     }
+    else res.constraint_violation = 0.;
     res.value = obj;
   }
 

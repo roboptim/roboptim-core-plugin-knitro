@@ -16,6 +16,7 @@
 // along with roboptim.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "roboptim/core/plugin/knitro/solver.hh"
+#include "roboptim/core/plugin/knitro/config.hh"
 
 #include <roboptim/core/function.hh>
 #include <roboptim/core/differentiable-function.hh>
@@ -119,26 +120,27 @@ using namespace roboptim;
 typedef KNITROSolver<EigenMatrixDense> knitroSolver_t;
 typedef knitroSolver_t::solver_t solver_t;
 
-ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ();
-ROBOPTIM_DLLEXPORT solver_t* create (const solver_t::problem_t&);
-ROBOPTIM_DLLEXPORT void destroy (solver_t*);
+ROBOPTIM_CORE_PLUGIN_KNITRO_DLLEXPORT unsigned getSizeOfProblem ();
+ROBOPTIM_CORE_PLUGIN_KNITRO_DLLEXPORT const char* getTypeIdOfConstraintsList ();
+ROBOPTIM_CORE_PLUGIN_KNITRO_DLLEXPORT solver_t* create (const solver_t::problem_t&);
+ROBOPTIM_CORE_PLUGIN_KNITRO_DLLEXPORT void destroy (solver_t*);
 
-ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ()
+unsigned getSizeOfProblem ()
 {
   return sizeof (solver_t::problem_t);
 }
 
-ROBOPTIM_DLLEXPORT const char* getTypeIdOfConstraintsList ()
+const char* getTypeIdOfConstraintsList ()
 {
   return typeid (solver_t::problem_t::constraintsList_t).name ();
 }
 
-ROBOPTIM_DLLEXPORT solver_t* create (const solver_t::problem_t& pb)
+solver_t* create (const solver_t::problem_t& pb)
 {
   return new knitroSolver_t (pb);
 }
 
-ROBOPTIM_DLLEXPORT void destroy (solver_t* p)
+void destroy (solver_t* p)
 {
   delete p;
 }

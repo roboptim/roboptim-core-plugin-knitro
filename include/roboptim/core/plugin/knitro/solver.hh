@@ -80,7 +80,7 @@ namespace roboptim
   /// \brief KNITRO based solver.
   /// \tparam T matrix type.
   template <typename T>
-  class ROBOPTIM_DLLEXPORT KNITROSolver : public Solver<T>
+  class KNITROSolver : public Solver<T>
   {
 
   public:
